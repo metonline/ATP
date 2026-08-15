@@ -1,4 +1,4 @@
-"""
+﻿"""
 IA Platform - Database Models
 SQLite for MVP, scales to PostgreSQL later
 """
@@ -75,47 +75,7 @@ class Parcel(Base):
     geometry_geojson = Column(Text, nullable=True)  # Full boundary polygon
 
 
-class SatelliteImage(Base):
-    """Cached satellite imagery for parcels"""
-    __tablename__ = "satellite_images"
 
-    id = Column(Integer, primary_key=True, index=True)
-    parcel_id = Column(Integer, ForeignKey("parcels.id"))
-
-    # Image metadata
-    acquisition_date = Column(DateTime)  # When satellite captured it
-    cloud_coverage_percent = Column(Float)
-    source = Column(String)  # "sentinel2", "landsat9", etc
-
-    # Image reference (for MVP - just links to external storage)
-    tile_url_rgb = Column(String)  # URL to RGB composite
-    tile_url_ndvi = Column(String)  # URL to NDVI index
-
-    # Image stats
-    mean_ndvi = Column(Float, nullable=True)  # Average NDVI for parcel
-    min_ndvi = Column(Float, nullable=True)
-    max_ndvi = Column(Float, nullable=True)
-
-    fetched_at = Column(DateTime, default=datetime.utcnow)
-
-
-class AnalysisResult(Base):
-    """Analysis results for a parcel"""
-    __tablename__ = "analysis_results"
-
-    id = Column(Integer, primary_key=True, index=True)
-    parcel_id = Column(Integer, ForeignKey("parcels.id"))
-
-    # Analysis type
-    analysis_type = Column(String)  # "ndvi", "moisture", "yield_forecast"
-    analysis_date = Column(DateTime)
-
-    # Result
-    recommendation = Column(String)  # "Healthy", "Needs irrigation", etc
-    confidence = Column(Float)  # 0.0 to 1.0
-    details = Column(Text)  # JSON with detailed metrics
-
-    created_at = Column(DateTime, default=datetime.utcnow)
 
 
 # Create all tables on startup
@@ -123,9 +83,24 @@ def init_db():
     Base.metadata.create_all(bind=engine)
 
 
+
+class SatelliteImage(Base):
+    __tablename__ = "satellite_images"
+    
+    id = Column(Integer, primary_key=True)
+    parcel_id = Column(Integer, ForeignKey("parcels.id"))
+    url = Column(String, nullable=True)
+    status = Column(String, default="pending")
+    error_message = Column(String, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
 def get_db():
     db = SessionLocal()
     try:
         yield db
     finally:
         db.close()
+        
+
+
+

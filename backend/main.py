@@ -580,12 +580,20 @@ async def fetch_satellite_image(parcel_id: int, background_tasks: BackgroundTask
     return {"status": "Fetching satellite image...", "parcel_id": parcel_id}
 
 def fetch_satellite_bg(parcel_id: int, lat: float, lng: float):
-    """Background: Sentinel-2 görüntüsünü indir"""
-    print(f"[BG] Starting satellite fetch for parcel {parcel_id}")
+    """Background: Sentinel-2 görüntüsünü indir ve database'e kaydet"""
+    from database import SessionLocal, SatelliteImage
+    db = SessionLocal()
+    
     try:
+        print(f"[BG] Starting satellite fetch for parcel {parcel_id}")
+        
+        # Database record oluştur (pending)
+        sat_image = SatelliteImage(parcel_id=parcel_id, status="pending")
+        db.add(sat_image)
+        db.commit()
+        
         print(f"[BG] Initializing Earth Engine...")
         ee.Initialize()
-        print(f"[BG] EE initialized, querying Sentinel-2...")
         
         geometry = ee.Geometry.Point([lng, lat])
         image = ee.ImageCollection('COPERNICUS/S2') \
@@ -596,16 +604,30 @@ def fetch_satellite_bg(parcel_id: int, lat: float, lng: float):
             .first()
         
         if image:
-            print(f"✓ Satellite image ready for parcel {parcel_id}")
+            image_rgb = image.select(['B4', 'B3', 'B2'])
+            url = image_rgb.getThumbURL({'min': 0, 'max': 3000, 'dimensions': 512})
+            sat_image.url = url
+            sat_image.status = "success"
+            db.commit()
+            print(f"✓ Satellite image ready for parcel {parcel_id}: {url}")
         else:
+            sat_image.status = "error"
+            sat_image.error_message = "No satellite image found"
+            db.commit()
             print(f"⚠ No satellite image found for parcel {parcel_id}")
     except Exception as e:
+        sat_image.status = "error"
+        sat_image.error_message = str(e)
+        db.commit()
         print(f"✗ Satellite fetch error: {e}")
+    finally:
+        db.close()
 
 @app.get("/api/parcels/{parcel_id}/satellite-status")
 async def get_satellite_status(parcel_id: int):
     """Satellite fetch durumu"""
     # TODO: Database'de status tutmak lazım
     return {"status": "pending", "parcel_id": parcel_id}
+
 
 
