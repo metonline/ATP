@@ -227,7 +227,7 @@ async def register(farmer: FarmerRegister, db: Session = Depends(get_db)):
 @app.post("/api/auth/login", response_model=TokenResponse)
 async def login(credentials: FarmerLogin, db: Session = Depends(get_db)):
     """Farmer login"""
-    farmer = db.query(Farmer).filter(Farmer.email == credentials.email).first()
+    farmer = db.query(Farmer).filter(Farmer.username == credentials.email).first()
 
     if not farmer or not verify_password(credentials.password, farmer.password_hash):
         raise HTTPException(status_code=401, detail="Invalid email or password")
@@ -655,3 +655,4 @@ async def get_satellite_image(parcel_id: int, db: Session = Depends(get_db)):
         }
     except Exception as e:
         return {"error": str(e)}
+
