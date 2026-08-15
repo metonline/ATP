@@ -601,7 +601,17 @@ def fetch_satellite_bg(parcel_id: int, lat: float, lng: float):
             .first()
         
         if image:
-            rgb = image.select(['B4', 'B3', 'B2'])
+            # Parsel polygon'ıyla clip et
+            import json
+            parcel = db.query(Parcel).filter(Parcel.id == parcel_id).first()
+            geom_dict = json.loads(parcel.geometry_geojson)
+            parcel_geometry = ee.Geometry(geom_dict)
+            
+            # Image'ı parsel sınırlarıyla kırp
+            clipped = image.clip(parcel_geometry)
+            
+            # RGB channels seç
+            rgb = clipped.select(['B4', 'B3', 'B2'])
             url = rgb.getThumbURL({'min': 0, 'max': 3000, 'dimensions': 512})
             
             image_record = db.query(SatelliteImage)\
@@ -668,6 +678,8 @@ async def get_satellite_image(parcel_id: int, db: Session = Depends(get_db)):
         }
     except Exception as e:
         return {"error": str(e)}
+
+
 
 
 
