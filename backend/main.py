@@ -580,46 +580,59 @@ async def fetch_satellite_image(parcel_id: int, background_tasks: BackgroundTask
     return {"status": "Fetching satellite image...", "parcel_id": parcel_id}
 
 def fetch_satellite_bg(parcel_id: int, lat: float, lng: float):
-    """Background: Sentinel-2 görüntüsünü indir ve database'e kaydet"""
+    """Background: Sentinel-2 uydu görüntüsünü indir"""
     from database import SessionLocal, SatelliteImage
     db = SessionLocal()
     
     try:
-        print(f"[BG] Starting satellite fetch for parcel {parcel_id}")
-        
-        # Database record oluştur (pending)
+        # First create satellite image record
         sat_image = SatelliteImage(parcel_id=parcel_id, status="pending")
         db.add(sat_image)
         db.commit()
         
-        print(f"[BG] Initializing Earth Engine...")
-        ee.Initialize()
+        ee.Initialize(project='renta-platform-505621')
         
         geometry = ee.Geometry.Point([lng, lat])
-        image = ee.ImageCollection('COPERNICUS/S2') \
-            .filterBounds(geometry) \
-            .filterDate('2026-02-15', '2026-08-15') \
-            .filter(ee.Filter.lt('CLOUDY_PIXEL_PERCENTAGE', 30)) \
-            .sort('system:time_start', False) \
+        image = ee.ImageCollection('COPERNICUS/S2_HARMONIZED')\
+            .filterBounds(geometry)\
+            .filterDate('2026-06-01', '2026-08-15')\
+            .filter(ee.Filter.lt('CLOUDY_PIXEL_PERCENTAGE', 30))\
+            .sort('system:time_start', False)\
             .first()
         
         if image:
-            image_rgb = image.select(['B4', 'B3', 'B2'])
-            url = image_rgb.getThumbURL({'min': 0, 'max': 3000, 'dimensions': 512})
-            sat_image.url = url
-            sat_image.status = "success"
-            db.commit()
-            print(f"✓ Satellite image ready for parcel {parcel_id}: {url}")
+            rgb = image.select(['B4', 'B3', 'B2'])
+            url = rgb.getThumbURL({'min': 0, 'max': 3000, 'dimensions': 512})
+            
+            image_record = db.query(SatelliteImage)\
+                .filter(SatelliteImage.parcel_id == parcel_id)\
+                .order_by(SatelliteImage.created_at.desc())\
+                .first()
+            
+            if image_record:
+                image_record.url = url
+                image_record.status = 'success'
+                db.commit()
+                print(f'✓ Satellite image ready for parcel {parcel_id}')
         else:
-            sat_image.status = "error"
-            sat_image.error_message = "No satellite image found"
-            db.commit()
-            print(f"⚠ No satellite image found for parcel {parcel_id}")
+            image_record = db.query(SatelliteImage)\
+                .filter(SatelliteImage.parcel_id == parcel_id)\
+                .order_by(SatelliteImage.created_at.desc())\
+                .first()
+            if image_record:
+                image_record.status = 'error'
+                image_record.error_message = 'No image found'
+                db.commit()
     except Exception as e:
-        sat_image.status = "error"
-        sat_image.error_message = str(e)
-        db.commit()
-        print(f"✗ Satellite fetch error: {e}")
+        image_record = db.query(SatelliteImage)\
+            .filter(SatelliteImage.parcel_id == parcel_id)\
+            .order_by(SatelliteImage.created_at.desc())\
+            .first()
+        if image_record:
+            image_record.status = 'error'
+            image_record.error_message = str(e)
+            db.commit()
+        print(f'✗ Error: {e}')
     finally:
         db.close()
 
@@ -655,4 +668,6 @@ async def get_satellite_image(parcel_id: int, db: Session = Depends(get_db)):
         }
     except Exception as e:
         return {"error": str(e)}
+
+
 
