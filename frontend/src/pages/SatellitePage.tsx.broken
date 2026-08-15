@@ -1,6 +1,6 @@
-﻿import React, { useState, useEffect } from "react";
-import { useParams } from "react-router-dom";
-import { api } from "../store/auth";
+﻿import React, { useState, useEffect } from 'react';
+import { useParams } from 'react-router-dom';
+import { api } from '../store/auth';
 
 interface SatelliteData {
   id: number;
@@ -28,11 +28,10 @@ export default function SatellitePage() {
   const fetchSatelliteImage = async () => {
     try {
       setLoading(true);
-      const url = `/api/parcels/${parcelId}/satellite`;
-      const response = await api.get(url);
+      const response = await api.get(/api/parcels/+parcelId+/satellite);
       setSatelliteData(response.data);
     } catch (err) {
-      console.error("Error fetching satellite:", err);
+      console.error('Error fetching satellite:', err);
     } finally {
       setLoading(false);
     }
@@ -41,16 +40,15 @@ export default function SatellitePage() {
   const requestNewImage = async () => {
     try {
       setRequesting(true);
-      const url = `/api/parcels/${parcelId}/satellite/fetch`;
-      await api.post(url);
-      setSatelliteData({ id: 0, parcel_id: parseInt(parcelId || "0"), status: "pending", url: null, error: null, created_at: "" });
+      await api.post(/api/parcels/+parcelId+/satellite/fetch);
+      setSatelliteData({ id: 0, parcel_id: parseInt(parcelId || '0'), status: 'pending', url: null, error: null, created_at: '' });
       
       setTimeout(() => {
         fetchSatelliteImage();
         setRequesting(false);
       }, 30000);
     } catch (err) {
-      console.error("Error requesting image:", err);
+      console.error('Error requesting image:', err);
       setRequesting(false);
     }
   };
@@ -72,24 +70,24 @@ export default function SatellitePage() {
             </div>
           ) : satelliteData ? (
             <div className="space-y-4">
-              {satelliteData.status === "success" ? (
+              {satelliteData.status === 'success' ? (
                 <div>
-                  <img src={satelliteData.url || ""} alt="Sentinel-2" className="w-full rounded-lg shadow" />
-                  <p className="text-sm text-gray-600 mt-2">📅 {new Date(satelliteData.created_at).toLocaleString("tr-TR")}</p>
+                  <img src={satelliteData.url || ''} alt="Sentinel-2" className="w-full rounded-lg shadow" />
+                  <p className="text-sm text-gray-600 mt-2">📅 {new Date(satelliteData.created_at).toLocaleString('tr-TR')}</p>
                 </div>
-              ) : satelliteData.status === "error" ? (
+              ) : satelliteData.status === 'error' ? (
                 <div className="bg-red-50 border border-red-200 rounded-lg p-4">
                   <p className="text-red-700 font-medium">❌ Hata</p>
                   <p className="text-red-600 text-sm mt-2">{satelliteData.error}</p>
                   <button onClick={requestNewImage} disabled={requesting} className="mt-4 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white px-4 py-2 rounded">
-                    {requesting ? "İsteniyor..." : "Tekrar İste"}
+                    {requesting ? 'İsteniyor...' : 'Tekrar İste'}
                   </button>
                 </div>
               ) : (
                 <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
                   <p className="text-yellow-700">⏳ Görüntü işleniyor...</p>
                   <button onClick={requestNewImage} disabled={requesting} className="mt-4 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white px-4 py-2 rounded">
-                    {requesting ? "İsteniyor..." : "Yeniden İste"}
+                    {requesting ? 'İsteniyor...' : 'Yeniden İste'}
                   </button>
                 </div>
               )}
@@ -98,7 +96,7 @@ export default function SatellitePage() {
             <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
               <p className="text-gray-700">Uydu görüntüsü bulunamadı</p>
               <button onClick={requestNewImage} disabled={requesting} className="mt-4 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white px-4 py-2 rounded">
-                {requesting ? "İsteniyor..." : "İlk Görüntüyü İste"}
+                {requesting ? 'İsteniyor...' : 'İlk Görüntüyü İste'}
               </button>
             </div>
           )}
@@ -107,3 +105,4 @@ export default function SatellitePage() {
     </div>
   );
 }
+

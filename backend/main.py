@@ -631,3 +631,27 @@ async def get_satellite_status(parcel_id: int):
 
 
 
+
+
+@app.get("/api/parcels/{parcel_id}/satellite")
+async def get_satellite_image(parcel_id: int, db: Session = Depends(get_db)):
+    """Son Sentinel-2 satellite image'ı döndür"""
+    try:
+        image = db.query(SatelliteImage) \
+            .filter(SatelliteImage.parcel_id == parcel_id) \
+            .order_by(SatelliteImage.created_at.desc()) \
+            .first()
+        
+        if not image:
+            return {"status": "pending", "url": None, "error": "No image yet"}
+        
+        return {
+            "id": image.id,
+            "parcel_id": image.parcel_id,
+            "status": image.status,
+            "url": image.url,
+            "error": image.error_message,
+            "created_at": image.created_at.isoformat()
+        }
+    except Exception as e:
+        return {"error": str(e)}
