@@ -1,10 +1,10 @@
-﻿"""
+﻿import ee
+"""
 IA Platform Backend API
 FastAPI server for farmer authentication, parcel management, satellite imagery
 """
 
-import ee
-from fastapi import FastAPI, BackgroundTasks, Depends, HTTPException, status, UploadFile, Header
+from fastapi import FastAPI, Depends, HTTPException, status, UploadFile, Header
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy.orm import Session
@@ -554,6 +554,35 @@ async def api_info():
 # ============================================================================
 # RUN LOCALLY
 # ============================================================================
+@app.get("/api/parcels/{parcel_id}/satellite")
+async def get_satellite_image(parcel_id: int):
+    """Parsel için Sentinel-2 görüntüsü"""
+    try:
+        parcel = db.query(Parcel).filter(Parcel.id == parcel_id).first()
+        if not parcel:
+            return {"error": "Parcel not found"}
+        
+        geometry = ee.Geometry.Point([parcel.centroid_lon, parcel.centroid_lat])
+        image = ee.ImageCollection('COPERNICUS/S2') \
+            .filterBounds(geometry) \
+            .filterDate('2026-07-15', '2026-08-15') \
+            .sort('system:time_start', False) \
+            .first()
+        
+        if not image:
+            return {"error": "No image found"}
+        
+        image_rgb = image.select(['B4', 'B3', 'B2'])
+        url = image_rgb.getThumbURL({
+            'min': 0, 'max': 3000,
+            'dimensions': 512,
+            'region': geometry.buffer(1000)
+        })
+        
+        return {"url": url, "satellite": "Sentinel-2"}
+    except Exception as e:
+        return {"error": str(e)}
+
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(
@@ -563,49 +592,5 @@ if __name__ == "__main__":
         reload=True
     )
 
-
-
-
-
-
-@app.post("/api/parcels/{parcel_id}/satellite/fetch")
-async def fetch_satellite_image(parcel_id: int, background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
-    """Sentinel-2 görüntüsünü background'da fetch et"""
-    parcel = db.query(Parcel).filter(Parcel.id == parcel_id).first()
-    if not parcel:
-        return {"error": "Parcel not found"}
-    
-    # Background task başlat
-    background_tasks.add_task(fetch_satellite_bg, parcel_id, parcel.centroid_lat, parcel.centroid_lon)
-    return {"status": "Fetching satellite image...", "parcel_id": parcel_id}
-
-def fetch_satellite_bg(parcel_id: int, lat: float, lng: float):
-    """Background: Sentinel-2 görüntüsünü indir"""
-    print(f"[BG] Starting satellite fetch for parcel {parcel_id}")
-    try:
-        print(f"[BG] Initializing Earth Engine...")
-        ee.Initialize()
-        print(f"[BG] EE initialized, querying Sentinel-2...")
-        
-        geometry = ee.Geometry.Point([lng, lat])
-        image = ee.ImageCollection('COPERNICUS/S2') \
-            .filterBounds(geometry) \
-            .filterDate('2026-02-15', '2026-08-15') \
-            .filter(ee.Filter.lt('CLOUDY_PIXEL_PERCENTAGE', 30)) \
-            .sort('system:time_start', False) \
-            .first()
-        
-        if image:
-            print(f"✓ Satellite image ready for parcel {parcel_id}")
-        else:
-            print(f"⚠ No satellite image found for parcel {parcel_id}")
-    except Exception as e:
-        print(f"✗ Satellite fetch error: {e}")
-
-@app.get("/api/parcels/{parcel_id}/satellite-status")
-async def get_satellite_status(parcel_id: int):
-    """Satellite fetch durumu"""
-    # TODO: Database'de status tutmak lazım
-    return {"status": "pending", "parcel_id": parcel_id}
 
 
