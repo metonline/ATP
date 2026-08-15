@@ -1,4 +1,4 @@
-import { create } from 'zustand';
+﻿import { create } from 'zustand';
 import axios from 'axios';
 
 interface Farmer {
@@ -39,7 +39,7 @@ const api = axios.create({
 // Add token to requests
 api.interceptors.request.use((config) => {
   const token = localStorage.getItem('token');
-  console.log('[REQ]', config.method?.toUpperCase(), config.url?.split('/').pop(), token ? '✓ TOKEN' : '❌ NO TOKEN');
+  console.log('[REQ]', config.method?.toUpperCase(), config.url?.split('/').pop(), token ? 'âœ“ TOKEN' : 'âŒ NO TOKEN');
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
   }
@@ -149,3 +149,4 @@ export const useAuthStore = create<AuthStore>((set) => ({
 }));
 
 export { api };
+
