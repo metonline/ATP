@@ -1,0 +1,990 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Platform Mimarisi - Dashboard</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background: #f9fafb;
+            color: #1f2937;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        .header h1 {
+            margin: 0 0 8px 0;
+            font-size: 28px;
+            color: #1f2937;
+        }
+
+        .header p {
+            margin: 0;
+            color: #6b7280;
+            font-size: 14px;
+        }
+
+        .tabs {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 30px;
+            border-bottom: 1px solid #e5e7eb;
+            flex-wrap: wrap;
+        }
+
+        .tab-btn {
+            padding: 12px 16px;
+            border: none;
+            background: transparent;
+            color: #6b7280;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 600;
+            border-bottom: 2px solid transparent;
+            transition: all 0.2s;
+        }
+
+        .tab-btn.active {
+            color: #1f2937;
+            border-bottom-color: #3b82f6;
+        }
+
+        .tab-btn:hover {
+            color: #1f2937;
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        .layer {
+            background: white;
+            border: 1px solid #e5e7eb;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+
+        .layer-title {
+            font-size: 14px;
+            font-weight: 700;
+            color: #6b7280;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 15px;
+        }
+
+        .modules-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+            gap: 12px;
+        }
+
+        .module {
+            background: linear-gradient(135deg, #3b82f6 0%, #1e40af 100%);
+            color: white;
+            padding: 16px;
+            border-radius: 6px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.2s;
+            border: 2px solid transparent;
+        }
+
+        .overview-layer {
+            background: linear-gradient(135deg, #3b82f6 0%, #1e40af 100%);
+            color: white;
+            padding: 16px;
+            border-radius: 6px;
+            text-align: center;
+            transition: all 0.2s;
+            cursor: pointer;
+            border: 2px solid transparent;
+        }
+
+        .overview-layer:nth-child(2) { background: linear-gradient(135deg, #10b981 0%, #059669 100%); }
+        .overview-layer:nth-child(3) { background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%); }
+        .overview-layer:nth-child(4) { background: linear-gradient(135deg, #ec4899 0%, #db2777 100%); }
+
+        .module:hover, .overview-layer:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        }
+
+        .module.active, .overview-layer.active {
+            border-color: #fbbf24;
+            box-shadow: 0 0 12px rgba(251, 191, 36, 0.5);
+        }
+
+        .module.agro { background: linear-gradient(135deg, #3b82f6 0%, #1e40af 100%); }
+        .module.monitor { background: linear-gradient(135deg, #fcd34d 0%, #f59e0b 100%); }
+        .module.livestock { background: linear-gradient(135deg, #10b981 0%, #059669 100%); }
+        .module.equipment { background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); }
+        .module.helpdesk { background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%); }
+        .module.market { background: linear-gradient(135deg, #ec4899 0%, #db2777 100%); }
+
+        .module-name {
+            font-size: 14px;
+            font-weight: 700;
+            margin-bottom: 4px;
+        }
+
+        .module-label {
+            font-size: 12px;
+            opacity: 0.9;
+        }
+
+        .module-details {
+            margin-top: 20px;
+            padding: 15px;
+            background: #f9fafb;
+            border-radius: 6px;
+            font-size: 13px;
+            color: #6b7280;
+            line-height: 1.6;
+        }
+
+        .features-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+        }
+
+        .feature {
+            background: white;
+            border: 1px solid #e5e7eb;
+            border-radius: 6px;
+            padding: 16px;
+        }
+
+        .feature-icon {
+            font-size: 28px;
+            margin-bottom: 8px;
+        }
+
+        .feature-title {
+            font-weight: 700;
+            color: #1f2937;
+            margin-bottom: 6px;
+            font-size: 14px;
+        }
+
+        .feature-desc {
+            font-size: 12px;
+            color: #6b7280;
+            line-height: 1.5;
+        }
+
+        .ecosystem-box {
+            background: white;
+            border: 2px solid #e5e7eb;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 15px;
+            text-align: center;
+        }
+
+        .ecosystem-title {
+            font-size: 14px;
+            font-weight: 700;
+            color: #1f2937;
+            margin-bottom: 12px;
+        }
+
+        .ecosystem-items {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            justify-content: center;
+        }
+
+        .ecosystem-item {
+            background: linear-gradient(135deg, #3b82f6 0%, #1e40af 100%);
+            color: white;
+            padding: 8px 12px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+
+        .ecosystem-item.farmer { background: linear-gradient(135deg, #10b981 0%, #059669 100%); }
+        .ecosystem-item.expert { background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%); }
+        .ecosystem-item.b2b { background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); }
+        .ecosystem-item.b2c { background: linear-gradient(135deg, #ec4899 0%, #db2777 100%); }
+
+        .flow-diagram {
+            background: white;
+            border: 1px solid #e5e7eb;
+            border-radius: 8px;
+            padding: 30px;
+            margin-bottom: 20px;
+        }
+
+        .flow-step {
+            display: flex;
+            align-items: center;
+            margin-bottom: 20px;
+            gap: 15px;
+        }
+
+        .flow-icon {
+            min-width: 60px;
+            width: 60px;
+            height: 60px;
+            background: linear-gradient(135deg, #3b82f6 0%, #1e40af 100%);
+            color: white;
+            border-radius: 6px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+        }
+
+        .flow-step.step-1 .flow-icon { background: linear-gradient(135deg, #3b82f6 0%, #1e40af 100%); }
+        .flow-step.step-2 .flow-icon { background: linear-gradient(135deg, #06b6d4 0%, #0891b2 100%); }
+        .flow-step.step-3 .flow-icon { background: linear-gradient(135deg, #10b981 0%, #059669 100%); }
+        .flow-step.step-4 .flow-icon { background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); }
+        .flow-step.step-5 .flow-icon { background: linear-gradient(135deg, #ec4899 0%, #db2777 100%); }
+        .flow-step.step-6 .flow-icon { background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%); }
+
+        .flow-content {
+            flex: 1;
+        }
+
+        .flow-title {
+            font-weight: 700;
+            color: #1f2937;
+            margin-bottom: 4px;
+        }
+
+        .flow-desc {
+            font-size: 13px;
+            color: #6b7280;
+        }
+
+        .flow-arrow {
+            text-align: center;
+            color: #3b82f6;
+            font-size: 24px;
+            margin: 10px 0;
+        }
+
+        .companion-timeline {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+            gap: 15px;
+            margin-top: 15px;
+        }
+
+        .time-block {
+            background: linear-gradient(135deg, rgba(59, 130, 246, 0.1) 0%, rgba(59, 130, 246, 0.05) 100%);
+            border: 1px solid #3b82f6;
+            border-radius: 6px;
+            padding: 15px;
+            text-align: center;
+        }
+
+        .time-label {
+            font-size: 12px;
+            font-weight: 700;
+            color: #3b82f6;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 8px;
+        }
+
+        .time-action {
+            font-size: 13px;
+            color: #1f2937;
+            line-height: 1.5;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>Akıllı Tarım (AT)</h1>
+            <p>AI-Destekli Tarımsal İstihbarat Platformu</p>
+        </div>
+
+        <div class="tabs">
+            <button class="tab-btn active" onclick="switchTab('overview')">📋 Genel Bakış</button>
+            <button class="tab-btn" onclick="switchTab('modules')">🔧 6 Modül</button>
+            <button class="tab-btn" onclick="switchTab('daily')">📅 Çiftçi Asistanı</button>
+            <button class="tab-btn" onclick="switchTab('ecosystem')">🌐 Ekosistem</button>
+            <button class="tab-btn" onclick="switchTab('dataintegration')">📡 Veri Entegrasyonu</button>
+            <button class="tab-btn" onclick="switchTab('multimodal')">🎙️ Çeşitli Kaynaklardan Veri Temini</button>
+            <button class="tab-btn" onclick="switchTab('dataflow')">📊 Veri Akışı</button>
+        </div>
+
+        <!-- Genel Bakış Tab -->
+        <div id="overview" class="tab-content active">
+            <div class="layer">
+                <div class="layer-title">5-Katmanlı Mimari</div>
+                <div class="modules-grid">
+                    <div class="overview-layer" onclick="selectOverviewLayer(this, 'layer1')">
+                        <div class="module-name">Çiftçi Portalı</div>
+                        <div class="module-label">Web + Mobil + Ses</div>
+                    </div>
+                    <div class="overview-layer" onclick="selectOverviewLayer(this, 'layer2')">
+                        <div class="module-name">6 Ana Modül</div>
+                        <div class="module-label">Üretimden Pazara</div>
+                    </div>
+                    <div class="overview-layer" onclick="selectOverviewLayer(this, 'layer3')">
+                        <div class="module-name">Hizmet Entegrasyonu</div>
+                        <div class="module-label">Danışman, Ödeme, Devlet</div>
+                    </div>
+                    <div class="overview-layer" onclick="selectOverviewLayer(this, 'layer4')">
+                        <div class="module-name">BİT Teknoloji Omurgası</div>
+                        <div class="module-label">Bilgi + İletişim Altyapısı</div>
+                    </div>
+                </div>
+            </div>
+
+            <div id="overviewDetails" class="layer" style="margin-top: 20px; display: none;">
+                <div class="layer-title" id="overviewTitle">Katman Detayları</div>
+                <div class="module-details" id="overviewDesc"></div>
+            </div>
+
+            <div class="layer" style="margin-top: 20px;">
+                <div class="layer-title">BİT Teknoloji Omurgası & İşbirlikleri (Bilgi + İletişim)</div>
+                <div class="features-grid">
+                    <div class="feature">
+                        <div class="feature-icon">📱</div>
+                        <div class="feature-title">İletişim Altyapısı (Kritik)</div>
+                        <div class="feature-desc"><strong>Mobil Bağlantı:</strong> 4G/LTE birincil, SMS/USSD yedek | <strong>Çevrimdışı Senkronizasyon:</strong> Yerel SQLite + nihai tutarlılık | <strong>Gerçek zamanlı:</strong> WebSocket push uyarıları</div>
+                    </div>
+                    <div class="feature">
+                        <div class="feature-icon">🛰️</div>
+                        <div class="feature-title">Uydu Verisi (Bilgi Katmanı)</div>
+                        <div class="feature-desc"><strong>Copernicus Birincil:</strong> Sentinel-2 + Sentinel-1 (ÜCRETSIZ) | <strong>Google EE:</strong> İsteğe bağlı premium</div>
+                    </div>
+                    <div class="feature">
+                        <div class="feature-icon">☁️</div>
+                        <div class="feature-title">Bulut Altyapısı</div>
+                        <div class="feature-desc">AWS (birincil) + Azure (yedeklilik) | Çok-bölge: Türkiye + AB | Veri teslim CDN</div>
+                    </div>
+                    <div class="feature">
+                        <div class="feature-icon">🧠</div>
+                        <div class="feature-title">AI & GPU İşlem</div>
+                        <div class="feature-desc">TensorFlow 2.x | SageMaker (talep üzerine) | Hastalık tespiti CNN | Model eğitim pipeline</div>
+                    </div>
+                    <div class="feature">
+                        <div class="feature-icon">🔒</div>
+                        <div class="feature-title">Veri & Güven Altyapısı</div>
+                        <div class="feature-desc">Türkiye Veri Merkezi (KVKK, BİT esnekliği) | AB Yedeklemesi | ISO 27001 + SOC 2 sertifikalı</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Modüller Tab -->
+        <div id="modules" class="tab-content">
+            <div class="layer">
+                <div class="layer-title">6 Ana Modül</div>
+                <div class="modules-grid">
+                    <div class="module agro" onclick="selectModule(this, 'agro')">
+                        <div class="module-name">FMIS.Agro</div>
+                        <div class="module-label">Üretim Planlama ERP</div>
+                    </div>
+                    <div class="module monitor" onclick="selectModule(this, 'monitor')">
+                        <div class="module-name">FMIS.Monitor</div>
+                        <div class="module-label">Uydu + IoT</div>
+                    </div>
+                    <div class="module livestock" onclick="selectModule(this, 'livestock')">
+                        <div class="module-name">FMIS.Livestock</div>
+                        <div class="module-label">Veteriner AI</div>
+                    </div>
+                    <div class="module equipment" onclick="selectModule(this, 'equipment')">
+                        <div class="module-name">FMIS.Makina-Ekipman</div>
+                        <div class="module-label">P2P Makina Kiralama</div>
+                    </div>
+                    <div class="module helpdesk" onclick="selectModule(this, 'helpdesk')">
+                        <div class="module-name">FMIS.AI-Helpdesk</div>
+                        <div class="module-label">24/7 Danışmanlık</div>
+                    </div>
+                    <div class="module market" onclick="selectModule(this, 'market')">
+                        <div class="module-name">FMIS.Market-Access</div>
+                        <div class="module-label">B2B + B2C</div>
+                    </div>
+                </div>
+            </div>
+
+            <div id="moduleDetails" class="layer" style="margin-top: 20px;">
+                <div class="layer-title" id="selectedModuleTitle">FMIS.Agro — Üretim Planlama ERP</div>
+                <div class="module-details" id="selectedModuleDesc">
+                    <strong>Parsel bazında 90 günlük üretim planlama</strong><br>
+                    • Talep tahmini (verim tahmini)<br>
+                    • Master üretim çizelgesi (haftalık zaman çizelgesi)<br>
+                    • Malzeme gereksinimleri (tohum, gübre, ilaç)<br>
+                    • Kapasite planlama (işçilik, ekipman)<br>
+                    • Maliyet muhasebesi (bütçe takibi)<br>
+                    • Günlük disiplin (disiplin zorlama)<br>
+                    <br>
+                    <strong>Hedef Sonuç:</strong> +20% verim, -15% maliyet, 96% plan uyumu
+                </div>
+            </div>
+        </div>
+
+        <!-- Çiftçi Asistanı Tab -->
+        <div id="daily" class="tab-content">
+            <div class="layer">
+                <div class="layer-title">Çiftçi Asistanı Sistemi</div>
+                <p style="color: #6b7280; font-size: 13px; margin-bottom: 15px;">
+                    Yapılandırılmış günlük katılım + blockchain günlüğü aracılığıyla çiftçi uyumunu sağlar
+                </p>
+
+                <div class="companion-timeline">
+                    <div class="time-block">
+                        <div class="time-label">🌅 Sabah</div>
+                        <div class="time-action">
+                            <strong>Bilgilendirme</strong><br>
+                            Bugünün görevleri, hava uyarıları, danışman ipuçları
+                        </div>
+                    </div>
+                    <div class="time-block">
+                        <div class="time-label">📍 Öğlen</div>
+                        <div class="time-action">
+                            <strong>Saha Kontrolü</strong><br>
+                            Foto yükle, görev durumu, gözlemler
+                        </div>
+                    </div>
+                    <div class="time-block">
+                        <div class="time-label">📝 Akşam</div>
+                        <div class="time-action">
+                            <strong>Rapor</strong><br>
+                            Günün özeti, kullanılan girdiler, sonuçlar
+                        </div>
+                    </div>
+                    <div class="time-block">
+                        <div class="time-label">🔐 Kilitle</div>
+                        <div class="time-action">
+                            <strong>Blockchain</strong><br>
+                            Gün değişmez defterde kilitlendi
+                        </div>
+                    </div>
+                </div>
+
+                <div class="module-details" style="margin-top: 20px;">
+                    <strong>Sonuç:</strong> 96% plan uyumu (vs 70% sezgisel)<br>
+                    <strong>Çiftçi Faydası:</strong> Tutarlı yürütme → öngörülebilir verim<br>
+                    <strong>Platform Faydası:</strong> AI model eğitimi + çalışma kanıtı
+                </div>
+            </div>
+        </div>
+
+        <!-- Ekosistem Tab -->
+        <div id="ecosystem" class="tab-content">
+            <div class="layer">
+                <div class="layer-title">Çok Paydaşlı Ekosistem</div>
+                <p style="color: #6b7280; font-size: 13px; margin-bottom: 20px;">
+                    Ağ etkileri: Çiftçiler → Danışmanlar → B2B/B2C alıcıları savunulabilir bir hendek oluşturur
+                </p>
+
+                <div class="ecosystem-box">
+                    <div class="ecosystem-title">🌾 Çiftçi Segmenti</div>
+                    <div class="ecosystem-items">
+                        <div class="ecosystem-item farmer">Üretim planlama</div>
+                        <div class="ecosystem-item farmer">Gerçek zamanlı izleme</div>
+                        <div class="ecosystem-item farmer">Danışman erişimi</div>
+                        <div class="ecosystem-item farmer">Ekipman kiralama</div>
+                        <div class="ecosystem-item farmer">Yüksek fiyatlandırma</div>
+                    </div>
+                </div>
+
+                <div class="ecosystem-box">
+                    <div class="ecosystem-title">👨‍💼 Uzman Danışman Segmenti</div>
+                    <div class="ecosystem-items">
+                        <div class="ecosystem-item expert">300+ doğrulanmış ziraat mühendisi</div>
+                        <div class="ecosystem-item expert">Proje bazında fiyatlandırma</div>
+                        <div class="ecosystem-item expert">10 kat çiftçi erişimi</div>
+                        <div class="ecosystem-item expert">480K-1.5M TL/yıl gelir</div>
+                    </div>
+                </div>
+
+                <div class="ecosystem-box">
+                    <div class="ecosystem-title">🏪 B2B Segmenti (Gıda Şirketleri)</div>
+                    <div class="ecosystem-items">
+                        <div class="ecosystem-item b2b">Doğrudan çiftçi kaynağı</div>
+                        <div class="ecosystem-item b2b">Kalite doğrulanmış</div>
+                        <div class="ecosystem-item b2b">-10% tedarikçi maliyeti</div>
+                        <div class="ecosystem-item b2b">Blockchain izlenebilirliği</div>
+                    </div>
+                </div>
+
+                <div class="ecosystem-box">
+                    <div class="ecosystem-title">👥 B2C Segmenti (Tüketiciler)</div>
+                    <div class="ecosystem-items">
+                        <div class="ecosystem-item b2c">QR kodu izlenebilirliği</div>
+                        <div class="ecosystem-item b2c">Çiftlikten masaya şeffaflık</div>
+                        <div class="ecosystem-item b2c">+20-30% fiyat primi</div>
+                        <div class="ecosystem-item b2c">Doğrulanmış sürdürülebilirlik</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Veri Entegrasyonu Tab -->
+        <div id="dataintegration" class="tab-content">
+            <div class="layer">
+                <div class="layer-title">Uzaktan Algılama Veri Kaynakları</div>
+                <div class="features-grid">
+                    <div class="feature">
+                        <div class="feature-icon">🛰️</div>
+                        <div class="feature-title">Uydu Görüntüleri (ESA)</div>
+                        <div class="feature-desc"><strong>Copernicus/Sentinel-2:</strong> 10m çözünürlük, vejetasyon indeksleri (NDVI, NDBI) | <strong>Sentinel-1:</strong> Radar, tüm hava koşulları, toprak nemi</div>
+                    </div>
+                    <div class="feature">
+                        <div class="feature-icon">🌤️</div>
+                        <div class="feature-title">Meteoroloji Verileri</div>
+                        <div class="feature-desc"><strong>TSMS (Türkiye Meteoroloji):</strong> Yağış, sıcaklık, nem, rüzgar | <strong>Tahmin:</strong> 10 günlük ön görü</div>
+                    </div>
+                    <div class="feature">
+                        <div class="feature-icon">📍</div>
+                        <div class="feature-title">Yer Tabanlı Sensörler</div>
+                        <div class="feature-desc">IoT toprak sensörleri (nem, sıcaklık) | Yerel hava istasyonları | Çiftçi-bildirilen saha gözlemleri</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="layer" style="margin-top: 20px;">
+                <div class="layer-title">Devlet & Kurum Veri Entegrasyonu</div>
+                <div class="features-grid">
+                    <div class="feature">
+                        <div class="feature-icon">📋</div>
+                        <div class="feature-title">LPIS (Parsel Envanteri)</div>
+                        <div class="feature-desc">Alan sınırları, ürün türleri, sahiplik geçmişi | Kıyaslama & sübsidi fırsatlarını etkinleştirir</div>
+                    </div>
+                    <div class="feature">
+                        <div class="feature-icon">📊</div>
+                        <div class="feature-title">TARSIM (Sigorta Verileri)</div>
+                        <div class="feature-desc">10+ yıl verim tahminleri | Ürün hasar değerlendirmeleri | AI modelleri için tarihsel doğrulama</div>
+                    </div>
+                    <div class="feature">
+                        <div class="feature-icon">🏛️</div>
+                        <div class="feature-title">Üniversite Ağları</div>
+                        <div class="feature-desc">Araştırma istasyonları (Ankara, Ege, Çukurova) | Ürün modelleri, hastalik izleme | Öğrenci işbirliği</div>
+                    </div>
+                    <div class="feature">
+                        <div class="feature-icon">🔗</div>
+                        <div class="feature-title">Kooperatif Sensörleri</div>
+                        <div class="feature-desc">Paylaşılan hava istasyonları (30+ kooperatif) | P2P sensör ağları | Topluluk-bildirilen gözlemler</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="layer" style="margin-top: 20px;">
+                <div class="layer-title">Bilgi İşleme Boru Hattı (İşleme Katmanı)</div>
+                <p style="color: #6b7280; font-size: 13px; margin-bottom: 15px;">
+                    Çoklu veri kaynakları → Doğrulama & çapraz kontrol → AI işleme → Çiftçi-aksiyolanabilir öneriler
+                </p>
+                <div class="features-grid">
+                    <div class="feature">
+                        <div class="feature-icon">🔀</div>
+                        <div class="feature-title">Veri Toplama</div>
+                        <div class="feature-desc">Uydu + hava + sensörler gerçek zamanlı birleştirilir</div>
+                    </div>
+                    <div class="feature">
+                        <div class="feature-icon">✓</div>
+                        <div class="feature-title">Doğrulama & Kalite</div>
+                        <div class="feature-desc">Çapraz sensör doğrulaması (uydu ≠ yer verileri → araştır)</div>
+                    </div>
+                    <div class="feature">
+                        <div class="feature-icon">🧠</div>
+                        <div class="feature-title">AI Çevirisi</div>
+                        <div class="feature-desc">Teknik veri → Çiftçi-anlaşılabilir öneriler</div>
+                    </div>
+                    <div class="feature">
+                        <div class="feature-icon">💾</div>
+                        <div class="feature-title">Sonuç Depolama</div>
+                        <div class="feature-desc">Öneriler çiftçiye iletişim için sıraya alınır</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="layer" style="margin-top: 20px;">
+                <div class="layer-title">İletişim Dağıtım Katmanı (Çiftçi Erişimi İçin Kritik)</div>
+                <p style="color: #6b7280; font-size: 13px; margin-bottom: 15px;">
+                    <strong style="color: #dc2626;">GÜVENİLİR İLETİŞİM OLMAKSIZIN BİLGİ HİÇ ÇIFTÇIYE ULAŞMAZ.</strong> Tüm bağlantı senaryolarında teslimi sağlamak için çoklu kanallar.
+                </p>
+                <div class="features-grid">
+                    <div class="feature">
+                        <div class="feature-icon">📱</div>
+                        <div class="feature-title">Mobil Push (Birincil)</div>
+                        <div class="feature-desc"><strong>4G/LTE Bağlı:</strong> Gerçek zamanlı WebSocket push | <strong>Uyarı:</strong> Çiftçinin telefonuna 30 saniyede ulaşır</div>
+                    </div>
+                    <div class="feature">
+                        <div class="feature-icon">🔄</div>
+                        <div class="feature-title">Çevrimdışı Senkronizasyon (Yedek)</div>
+                        <div class="feature-desc"><strong>Bağlantı Yok:</strong> Yerel SQLite önerileri önbelleğe alır | <strong>Çevrimiçi Olunca:</strong> Bulutla çift yönlü sync | <strong>Sonuç:</strong> Çiftçi günler değil saatler içinde veri görür</div>
+                    </div>
+                    <div class="feature">
+                        <div class="feature-icon">💬</div>
+                        <div class="feature-title">SMS/USSD (Sınır Durumu)</div>
+                        <div class="feature-desc"><strong>Uygulama/Veri Yok:</strong> Acil uyarılar SMS ile | <strong>Telefon Sinyali Yok:</strong> USSD (çevir *123) temel bilgiler için</div>
+                    </div>
+                    <div class="feature">
+                        <div class="feature-icon">🗣️</div>
+                        <div class="feature-title">Sesli & Yayın</div>
+                        <div class="feature-desc">Kooperatif pano | Topluluk mesajlaşması | Uzman hotline (1 saatlik yanıt)</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="layer" style="margin-top: 20px;">
+                <div class="layer-title">Çiftçi Eylemi & Geri Bildirim Döngüsü</div>
+                <div class="features-grid">
+                    <div class="feature">
+                        <div class="feature-icon">✋</div>
+                        <div class="feature-title">Çiftçi Uyarı Alır</div>
+                        <div class="feature-desc">Mobil, SMS veya çevrimdışı sync aracılığıyla — çiftçi ne yapacağını ve neden yapacağını bilir</div>
+                    </div>
+                    <div class="feature">
+                        <div class="feature-icon">🚜</div>
+                        <div class="feature-title">Çiftçi Harekete Geçer</div>
+                        <div class="feature-desc">Sulama yapar, böcek ilacı püskürtür, uygun zamanda hasat eder</div>
+                    </div>
+                    <div class="feature">
+                        <div class="feature-icon">📝</div>
+                        <div class="feature-title">Çiftçi Sonucu Kaydeder</div>
+                        <div class="feature-desc">Ne işe yaradı? Ne işe yaramadı? Uygulama gerçek sonuçlardan öğrenir</div>
+                    </div>
+                    <div class="feature">
+                        <div class="feature-icon">🔁</div>
+                        <div class="feature-title">Model İyileştirmesi</div>
+                        <div class="feature-desc">Gelecek sezon: Gerçek veri AI'ı beslendiği için daha iyi öneriler</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Veri Akışı Tab -->
+        <div id="dataflow" class="tab-content">
+            <div class="flow-diagram">
+                <div class="layer-title">Platform İçindeki Veri Yolculuğu</div>
+
+                <div class="flow-step step-1">
+                    <div class="flow-icon">👨‍🌾</div>
+                    <div class="flow-content">
+                        <div class="flow-title">1. Çiftçi Girişi</div>
+                        <div class="flow-desc">Günlük gözlemler, görev tamamlamaları, mobil/web/ses yoluyla manuel ölçümler</div>
+                    </div>
+                </div>
+
+                <div class="flow-arrow">↓</div>
+
+                <div class="flow-step step-2">
+                    <div class="flow-icon">🔄</div>
+                    <div class="flow-content">
+                        <div class="flow-title">2. Veri Toplama</div>
+                        <div class="flow-desc">Doğrulama + sensör füzyonu (IoT + uydu + hava) + anomali tespiti</div>
+                    </div>
+                </div>
+
+                <div class="flow-arrow">↓</div>
+
+                <div class="flow-step step-3">
+                    <div class="flow-icon">🤖</div>
+                    <div class="flow-content">
+                        <div class="flow-title">3. AI İşleme</div>
+                        <div class="flow-desc">Verim tahmini, risk değerlendirmesi, hastalık tespiti (CNN), öneriler</div>
+                    </div>
+                </div>
+
+                <div class="flow-arrow">↓</div>
+
+                <div class="flow-step step-4">
+                    <div class="flow-icon">⛓️</div>
+                    <div class="flow-content">
+                        <div class="flow-title">4. Blockchain Depolaması & AI Sonuçları</div>
+                        <div class="flow-desc">Değişmez öneriler sırasına alındı | Kalite doğrulaması | Dijital imzalar | Denetim izi</div>
+                    </div>
+                </div>
+
+                <div class="flow-arrow">↓</div>
+
+                <div class="flow-step step-5">
+                    <div class="flow-icon">📱</div>
+                    <div class="flow-content">
+                        <div class="flow-title">5. İletişim Dağıtımı (KRİTİK)</div>
+                        <div class="flow-desc"><strong>Çoklu kanallar:</strong> Mobil push (4G/LTE) → Çevrimdışı sync (SQLite sırası) → SMS/USSD (yedek) → Sesli uyarılar | <strong>Hedef:</strong> Çiftçi dakikalar içinde öneri alır, günler değil</div>
+                    </div>
+                </div>
+
+                <div class="flow-arrow">↓</div>
+
+                <div class="flow-step step-6">
+                    <div class="flow-icon">👨‍🌾</div>
+                    <div class="flow-content">
+                        <div class="flow-title">6. Çiftçi Alımı & Eylemi (Geri Bildirim Döngüsü)</div>
+                        <div class="flow-desc">Çiftçi tercih ettiği kanal aracılığıyla uyarı alır | Öneriyi anlar | Harekete geçer (sulama, püskürtme, hasat) | Sonucu geri bildirim için kaydeder</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="layer">
+                <div class="layer-title">Teknoloji Yığını</div>
+                <div class="features-grid">
+                    <div class="feature">
+                        <div class="feature-icon">💾</div>
+                        <div class="feature-title">Backend</div>
+                        <div class="feature-desc">Python, Node.js, Go<br>PostgreSQL, MongoDB, Redis</div>
+                    </div>
+                    <div class="feature">
+                        <div class="feature-icon">🎨</div>
+                        <div class="feature-title">Frontend</div>
+                        <div class="feature-desc">React.js + TypeScript<br>React Native (iOS/Android)</div>
+                    </div>
+                    <div class="feature">
+                        <div class="feature-icon">🧠</div>
+                        <div class="feature-title">AI/ML</div>
+                        <div class="feature-desc">TensorFlow 2.x<br>Google Earth Engine, Hugging Face</div>
+                    </div>
+                    <div class="feature">
+                        <div class="feature-icon">☁️</div>
+                        <div class="feature-title">Bulut</div>
+                        <div class="feature-desc">AWS (EC2, Lambda, RDS)<br>Docker, Kubernetes</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Çeşitli Kaynaklardan Veri Temini Sekmesi -->
+        <div id="multimodal" class="tab-content">
+            <div class="layer">
+                <div class="layer-title">Çeşitli Kaynaklardan Veri Temini Mimarisi</div>
+                <p style="color: #6b7280; margin-bottom: 20px;">Platform, çiftçilerin doğal olarak kullandıkları tüm veri türlerini kabul eder. İş akışı değişimi gerekmez.</p>
+
+                <div class="features-grid">
+                    <div class="feature">
+                        <div class="feature-icon">🎙️</div>
+                        <div class="feature-title">Ses (STT + NLP)</div>
+                        <div class="feature-desc">Türkçe ses tanıma • Komut tanıma • Not tutma • Görev planlama</div>
+                    </div>
+                    <div class="feature">
+                        <div class="feature-icon">📸</div>
+                        <div class="feature-title">Görüntü (OCR + CV)</div>
+                        <div class="feature-desc">Fatura taraması • Hastalık tespiti • Kalite kontrol • QR kod okuma</div>
+                    </div>
+                    <div class="feature">
+                        <div class="feature-icon">🎬</div>
+                        <div class="feature-title">Video (Eylem Tanıma)</div>
+                        <div class="feature-desc">Tarla gezintisi • Hasat belgeleri • Ekipman analizi • Drone görüntüleri</div>
+                    </div>
+                    <div class="feature">
+                        <div class="feature-icon">✍️</div>
+                        <div class="feature-title">Manuel Giriş</div>
+                        <div class="feature-desc">Mobil/web formlar • Takvim planlaması • Sürükle-bırak görevler • Kontrol listesi</div>
+                    </div>
+                    <div class="feature">
+                        <div class="feature-icon">💬</div>
+                        <div class="feature-title">Metin Mesajlaşma</div>
+                        <div class="feature-desc">SMS komutları • WhatsApp güncellemeleri • Email belgeler • Telegram botu</div>
+                    </div>
+                    <div class="feature">
+                        <div class="feature-icon">🔌</div>
+                        <div class="feature-title">Sensörler & IoT</div>
+                        <div class="feature-desc">Toprak nemi • Hava verisi • Uydu NDVI • GPS takip • Ekipman sensörleri</div>
+                    </div>
+                    <div class="feature">
+                        <div class="feature-icon">🥽</div>
+                        <div class="feature-title">AR Gerçek Zaman</div>
+                        <div class="feature-desc">Hastalık tanısı • Kalite overlay • Tedavi adımları • Tedarikçi önerileri</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="layer" style="margin-top: 20px;">
+                <div class="layer-title">İşleme Hattı</div>
+                <div class="features-grid">
+                    <div class="feature">
+                        <div class="feature-icon">📥</div>
+                        <div class="feature-title">1. Ekstraksiyon</div>
+                        <div class="feature-desc">Tüm kaynaklardan otomatik çıkarım (ses, görüntü, sensör, metin)</div>
+                    </div>
+                    <div class="feature">
+                        <div class="feature-icon">🔄</div>
+                        <div class="feature-title">2. Standartlaştırma</div>
+                        <div class="feature-desc">Birim, kategori, tarih formatlarını standartlaştır</div>
+                    </div>
+                    <div class="feature">
+                        <div class="feature-icon">🔗</div>
+                        <div class="feature-title">3. Fusion</div>
+                        <div class="feature-desc">Çoklu modal veri birleştir (ses + sensör + geçmiş)</div>
+                    </div>
+                    <div class="feature">
+                        <div class="feature-icon">✅</div>
+                        <div class="feature-title">4. Doğrulama</div>
+                        <div class="feature-desc">Tarla geçmişi + agronomist yönergeleri karşı kontrol (%95 doğruluk)</div>
+                    </div>
+                    <div class="feature">
+                        <div class="feature-icon">📊</div>
+                        <div class="feature-title">5. Kategorilendirme</div>
+                        <div class="feature-desc">Doğru modüle otomatik yönlendir (Agro, Monitor, Market)</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="layer" style="margin-top: 20px;">
+                <div class="layer-title">Veri Birikimi Stratejisi (Y1 → Y5)</div>
+                <div class="features-grid">
+                    <div class="feature">
+                        <div class="feature-icon">📈</div>
+                        <div class="feature-title">Yıl 1-2: AI Temeli</div>
+                        <div class="feature-desc">Uydu + hava + üniversite verisi (%80 doğruluk bölgesel)</div>
+                    </div>
+                    <div class="feature">
+                        <div class="feature-icon">🤝</div>
+                        <div class="feature-title">Yıl 2-3: Kitlesel Katılım</div>
+                        <div class="feature-desc">150K+ uzman değerlendirmesi + pazar işlemleri</div>
+                    </div>
+                    <div class="feature">
+                        <div class="feature-icon">💎</div>
+                        <div class="feature-title">Yıl 3-5: Sahici Zeka</div>
+                        <div class="feature-desc">Parsel-düzey tahminler (±%5 doğruluk) → B2B veri lisanslama (Y5: 15-20M TL)</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const overviewData = {
+            layer1: {
+                title: '1. Çiftçi Portalı (Web + Mobil + Ses)',
+                desc: '<strong>Katman 1 — Kullanıcı Arayüzü:</strong><br>' +
+                    '• <strong>Web Uygulaması:</strong> Masaüstü & tablet, detaylı analitik, geçmiş rapor<br>' +
+                    '• <strong>Mobil Uygulama:</strong> Android/iOS, çevrimdışı modu, düşük bant genişliği optimizasyonu<br>' +
+                    '• <strong>Ses Arayüzü:</strong> Telefonla erişim (USSD), işletme sınırı durumları için SMS<br>' +
+                    '• <strong>Erişilebilirlik:</strong> Türkçe, okuma, gözleri kapanır yapan yazı boyutu<br><br>' +
+                    '<strong>Kritik Özellik:</strong> Çevrimdışı çalışır (veri bağlantısı olmadan), çevrimiçi olunca senkronize'
+            },
+            layer2: {
+                title: '2. 6 Ana Modül (Üretimden Pazara)',
+                desc: '<strong>Katman 2 — İşlevsel Modüller:</strong><br>' +
+                    '• <strong>FMIS.Agro:</strong> 90 günlük üretim planlama, ERP benzeri yapı<br>' +
+                    '• <strong>FMIS.Monitor:</strong> Uydu/IoT sağlık izleme, AI hastalık tespiti<br>' +
+                    '• <strong>FMIS.Livestock:</strong> Hayvancılık yönetimi, AI tanısı<br>' +
+                    '• <strong>FMIS.Makina-Ekipman:</strong> P2P ekipman pazarı (kiralama)<br>' +
+                    '• <strong>FMIS.AI-Helpdesk:</strong> 24/7 chatbot + uzman ağı<br>' +
+                    '• <strong>FMIS.Market-Access:</strong> B2B/B2C ticaret, blockchain izlenebilirliği<br><br>' +
+                    '<strong>Entegrasyon:</strong> Tüm modüller bir central veri modeli kullanır'
+            },
+            layer3: {
+                title: '3. Hizmet Entegrasyonu (Danışman, Ödeme, Devlet)',
+                desc: '<strong>Katman 3 — İşbirliği Ortakları:</strong><br>' +
+                    '• <strong>Danışman Ağı:</strong> 300+ doğrulanmış agronomist, proje bazında fiyatlandırma<br>' +
+                    '• <strong>Ödeme İşleme:</strong> Stripe/PayTR, emanet, bölme ödemeleri<br>' +
+                    '• <strong>Devlet Entegrasyonu:</strong> LPIS, uydu verisi (Copernicus), TARSIM verilerine erişim<br>' +
+                    '• <strong>Sigorta:</strong> AgriInsure, doğal afet kapsamı, risk puanları<br>' +
+                    '• <strong>Kooperatif Bağlantıları:</strong> Toplu satın alma, paylaşılan sensörler<br><br>' +
+                    '<strong>Kritik Rol:</strong> Çiftçileri pazar ve destek kaynağına bağlar'
+            },
+            layer4: {
+                title: '4. BİT Teknoloji Omurgası (Bilgi + İletişim)',
+                desc: '<strong>Katman 4 — Altyapı (Bilgi & İletişim Teknolojileri):</strong><br>' +
+                    '• <strong>Bilgi (IT):</strong> Uydu verisi, AI işleme, bulut altyapısı, veri güvenliği<br>' +
+                    '• <strong>İletişim (CT):</strong> Mobil 4G/LTE, SMS/USSD yedek, çevrimdışı senkronizasyon<br>' +
+                    '• <strong>Bulut:</strong> AWS/Azure, çok-bölge çoğaltma, CDN teslimi<br>' +
+                    '• <strong>AI & ML:</strong> TensorFlow, hastalık CNN, verim tahminleme<br>' +
+                    '• <strong>Veri Güvenliği:</strong> KVKK uyumu, Türkiye veri merkezi, ISO 27001<br><br>' +
+                    '<strong>Kritik İçgörü:</strong> BİT Omurgası olmaksızın herhangi bir modül çiftçiye ulaşamaz'
+            }
+        };
+
+        const moduleData = {
+            agro: {
+                title: 'FMIS.Agro — Üretim Planlama ERP',
+                desc: '<strong>Parsel bazında 90 günlük üretim planlama</strong><br>• Talep tahmini (verim tahmini)<br>• Master üretim çizelgesi (haftalık zaman çizelgesi)<br>• Malzeme gereksinimleri (tohum, gübre, ilaç)<br>• Kapasite planlama (işçilik, ekipman)<br>• Maliyet muhasebesi (bütçe takibi)<br>• Günlük disiplin (disiplin zorlama)<br><br><strong>Hedef Sonuç:</strong> +20% verim, -15% maliyet, 96% plan uyumu'
+            },
+            monitor: {
+                title: 'FMIS.Monitor — Uydu + IoT İzleme',
+                desc: '<strong>Gerçek zamanlı ürün sağlığı izleme</strong><br>• Uydu NDVI (haftalık vejetasyon sağlığı)<br>• Hava uyarıları (yağış tahmini, don uyarısı)<br>• IoT sensörleri (toprak nemi, sıcaklık)<br>• Hastalık tespiti (CNN tabanlı görüntü analizi)<br>• Risk puanlaması (fungal/böcek/su stresi)<br><br><strong>Hedef Sonuç:</strong> Hastalık tespiti 72 saat erken, %90 kadar önleme oranı'
+            },
+            livestock: {
+                title: 'FMIS.Livestock — Veteriner AI',
+                desc: '<strong>Hayvancılık yönetimi ve izleme</strong><br>• Giyilebilir izleme (sağlık sensörleri)<br>• AI tanısı (veteriner sorunu tanımlaması)<br>• Verimlilik takibi (süt verimi, yumurta)<br>• Otomatik uyarılar (sağlık, verimlilik)<br>• Veteriner ağı (danışmanlık)<br><br><strong>Hedef Sonuç:</strong> -%30 veteriner maliyeti, +%15 verimlilik'
+            },
+            equipment: {
+                title: 'FMIS.Makina-Ekipman — P2P Pazarı',
+                desc: '<strong>Eşler arası ekipman kiralama</strong><br>• Ekipman envanteri (traktör, hasat makinesi, püskürtücü)<br>• Kullanılabilirlik eşleştirmesi (bölgesel)<br>• Rezervasyon sistemi (tarih/saat çizelgesi)<br>• Ödeme işleme (güvenli, emanet)<br>• Kalite değerlendirmesi (durum, güvenilirlik)<br>• Sigorta entegrasyonu (hasar kapsamı)<br><br><strong>Hedef Sonuç:</strong> +%40 kullanım, -%20 çiftçi ekipman maliyeti'
+            },
+            helpdesk: {
+                title: 'FMIS.AI-Helpdesk — 24/7 Danışmanlık',
+                desc: '<strong>Otomatik + uzman danışmanlık hizmeti</strong><br>• AI chatbot (yaygın S&C, anında yanıt)<br>• Uzman yükseltmesi (karmaşık sorular → insan)<br>• Bilgi tabanı (1000+ makale)<br>• Uzman bağlantısı (danışmanlara eşleştirme)<br>• Bilgi yayılması (eğitim içeriği)<br><br><strong>Sonuç:</strong> Danışmanlık erişimi 24 saat → 2 saat yanıt'
+            },
+            market: {
+                title: 'FMIS.Market-Access — B2B/B2C Ticaret',
+                desc: '<strong>Doğrudan pazar erişimi (aracı ortadan kaldırma)</strong><br><strong>B2B:</strong> Gıda şirketi doğrudan kaynağı, kalite özellikleri, blockchain takibi<br><strong>B2C:</strong> QR kodu izlenebilirliği, yüksek pazarı, tüketici yorumları<br><br><strong>Hedef Sonuç:</strong> Aracı ortadan kaldırıldı, çiftçiler için +%20-30% fiyat primi'
+            }
+        };
+
+        function switchTab(tabName) {
+            document.querySelectorAll('.tab-content').forEach(tab => {
+                tab.classList.remove('active');
+            });
+
+            document.querySelectorAll('.tab-btn').forEach(btn => {
+                btn.classList.remove('active');
+            });
+
+            document.getElementById(tabName).classList.add('active');
+            event.target.classList.add('active');
+
+            // Genel Bakış tabına gelince detayları gizle
+            if (tabName === 'overview') {
+                document.getElementById('overviewDetails').style.display = 'none';
+            }
+        }
+
+        function selectOverviewLayer(element, layer) {
+            document.querySelectorAll('.overview-layer').forEach(m => {
+                m.classList.remove('active');
+            });
+
+            element.classList.add('active');
+
+            const data = overviewData[layer];
+            document.getElementById('overviewDetails').style.display = 'block';
+            document.getElementById('overviewTitle').textContent = data.title;
+            document.getElementById('overviewDesc').innerHTML = data.desc;
+
+            // Detaylara scroll
+            document.getElementById('overviewDetails').scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+
+        function selectModule(element, module) {
+            document.querySelectorAll('.module').forEach(m => {
+                m.classList.remove('active');
+            });
+
+            element.classList.add('active');
+
+            const data = moduleData[module];
+            document.getElementById('selectedModuleTitle').textContent = data.title;
+            document.getElementById('selectedModuleDesc').innerHTML = data.desc;
+        }
+
+        window.addEventListener('load', () => {
+            document.querySelector('.module').click();
+        });
+    </script>
+</body>
+</html>

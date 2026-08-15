@@ -1,0 +1,669 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Platform Architecture Dashboard</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background: transparent;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        
+        .header h1 {
+            margin: 0 0 8px 0;
+            font-size: 28px;
+            color: var(--text-primary);
+        }
+        
+        .header p {
+            margin: 0;
+            color: var(--text-secondary);
+            font-size: 14px;
+        }
+        
+        .tabs {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 30px;
+            border-bottom: 1px solid var(--border-color);
+            flex-wrap: wrap;
+        }
+        
+        .tab-btn {
+            padding: 12px 16px;
+            border: none;
+            background: transparent;
+            color: var(--text-secondary);
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 600;
+            border-bottom: 2px solid transparent;
+            transition: all 0.2s;
+        }
+        
+        .tab-btn.active {
+            color: var(--text-primary);
+            border-bottom-color: #3b82f6;
+        }
+        
+        .tab-btn:hover {
+            color: var(--text-primary);
+        }
+        
+        .tab-content {
+            display: none;
+        }
+        
+        .tab-content.active {
+            display: block;
+        }
+        
+        /* Architecture View */
+        .architecture {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 20px;
+        }
+        
+        .layer {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 20px;
+        }
+        
+        .layer-title {
+            font-size: 14px;
+            font-weight: 700;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 15px;
+        }
+        
+        .modules-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+            gap: 12px;
+        }
+        
+        .module {
+            background: linear-gradient(135deg, #3b82f6 0%, #1e40af 100%);
+            color: white;
+            padding: 16px;
+            border-radius: 6px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.2s;
+            border: 2px solid transparent;
+        }
+        
+        .module:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        }
+        
+        .module.active {
+            border-color: #fbbf24;
+            box-shadow: 0 0 12px rgba(251, 191, 36, 0.5);
+        }
+        
+        .module.livestock { background: linear-gradient(135deg, #10b981 0%, #059669 100%); }
+        .module.equipment { background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); }
+        .module.helpdesk { background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%); }
+        .module.market { background: linear-gradient(135deg, #ec4899 0%, #db2777 100%); }
+        
+        .module-name {
+            font-size: 14px;
+            font-weight: 700;
+            margin-bottom: 4px;
+        }
+        
+        .module-label {
+            font-size: 12px;
+            opacity: 0.9;
+        }
+        
+        .module-details {
+            margin-top: 20px;
+            padding: 15px;
+            background: var(--bg-tertiary);
+            border-radius: 6px;
+            font-size: 13px;
+            color: var(--text-secondary);
+            line-height: 1.6;
+        }
+        
+        /* Data Flow */
+        .flow-diagram {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 30px;
+            margin-bottom: 20px;
+        }
+        
+        .flow-step {
+            display: flex;
+            align-items: center;
+            margin-bottom: 20px;
+            gap: 15px;
+        }
+        
+        .flow-icon {
+            min-width: 60px;
+            width: 60px;
+            height: 60px;
+            background: linear-gradient(135deg, #3b82f6 0%, #1e40af 100%);
+            color: white;
+            border-radius: 6px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+        }
+        
+        .flow-content {
+            flex: 1;
+        }
+        
+        .flow-title {
+            font-weight: 700;
+            color: var(--text-primary);
+            margin-bottom: 4px;
+        }
+        
+        .flow-desc {
+            font-size: 13px;
+            color: var(--text-secondary);
+        }
+        
+        .flow-arrow {
+            text-align: center;
+            color: #3b82f6;
+            font-size: 24px;
+            margin: 10px 0;
+        }
+        
+        /* Daily Companion */
+        .companion-timeline {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+            gap: 15px;
+            margin-top: 15px;
+        }
+        
+        .time-block {
+            background: linear-gradient(135deg, rgba(59, 130, 246, 0.1) 0%, rgba(59, 130, 246, 0.05) 100%);
+            border: 1px solid #3b82f6;
+            border-radius: 6px;
+            padding: 15px;
+            text-align: center;
+        }
+        
+        .time-label {
+            font-size: 12px;
+            font-weight: 700;
+            color: #3b82f6;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 8px;
+        }
+        
+        .time-action {
+            font-size: 13px;
+            color: var(--text-primary);
+            line-height: 1.5;
+        }
+        
+        /* Features Grid */
+        .features-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+        }
+        
+        .feature {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            padding: 16px;
+        }
+        
+        .feature-icon {
+            font-size: 28px;
+            margin-bottom: 8px;
+        }
+        
+        .feature-title {
+            font-weight: 700;
+            color: var(--text-primary);
+            margin-bottom: 6px;
+            font-size: 14px;
+        }
+        
+        .feature-desc {
+            font-size: 12px;
+            color: var(--text-secondary);
+            line-height: 1.5;
+        }
+        
+        /* Ecosystem */
+        .ecosystem-box {
+            background: var(--bg-secondary);
+            border: 2px solid var(--border-color);
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 15px;
+            text-align: center;
+        }
+        
+        .ecosystem-title {
+            font-size: 14px;
+            font-weight: 700;
+            color: var(--text-primary);
+            margin-bottom: 12px;
+        }
+        
+        .ecosystem-items {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            justify-content: center;
+        }
+        
+        .ecosystem-item {
+            background: linear-gradient(135deg, #3b82f6 0%, #1e40af 100%);
+            color: white;
+            padding: 8px 12px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+        
+        .ecosystem-item.farmer { background: linear-gradient(135deg, #10b981 0%, #059669 100%); }
+        .ecosystem-item.expert { background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%); }
+        .ecosystem-item.b2b { background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); }
+        .ecosystem-item.b2c { background: linear-gradient(135deg, #ec4899 0%, #db2777 100%); }
+        
+        .flow-chart {
+            margin-top: 20px;
+            padding: 20px;
+            background: var(--bg-secondary);
+            border-radius: 8px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>Platform Architecture</h1>
+            <p>AI-Powered Integrated Agricultural System</p>
+        </div>
+        
+        <div class="tabs">
+            <button class="tab-btn active" onclick="switchTab('overview')">📋 Overview</button>
+            <button class="tab-btn" onclick="switchTab('modules')">🔧 6 Modules</button>
+            <button class="tab-btn" onclick="switchTab('daily')">📅 Daily Companion</button>
+            <button class="tab-btn" onclick="switchTab('ecosystem')">🌐 Ecosystem</button>
+            <button class="tab-btn" onclick="switchTab('dataflow')">📊 Data Flow</button>
+        </div>
+        
+        <!-- Overview Tab -->
+        <div id="overview" class="tab-content active">
+            <div class="layer">
+                <div class="layer-title">Platform Layers</div>
+                <div class="modules-grid">
+                    <div class="module">
+                        <div class="module-name">Farmer Portal</div>
+                        <div class="module-label">Web + Mobile + Voice</div>
+                    </div>
+                    <div class="module">
+                        <div class="module-name">6 Core Modules</div>
+                        <div class="module-label">Production to Market</div>
+                    </div>
+                    <div class="module">
+                        <div class="module-name">Expert Marketplace</div>
+                        <div class="module-label">300+ Consultants</div>
+                    </div>
+                    <div class="module">
+                        <div class="module-name">Blockchain</div>
+                        <div class="module-label">Hyperledger + Ethereum</div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="layer" style="margin-top: 20px;">
+                <div class="layer-title">Key Integration Points</div>
+                <div class="features-grid">
+                    <div class="feature">
+                        <div class="feature-icon">🛰️</div>
+                        <div class="feature-title">Satellite Data</div>
+                        <div class="feature-desc">Google Earth Engine + NDVI monitoring</div>
+                    </div>
+                    <div class="feature">
+                        <div class="feature-icon">🌤️</div>
+                        <div class="feature-title">Weather API</div>
+                        <div class="feature-desc">Real-time alerts + forecasting</div>
+                    </div>
+                    <div class="feature">
+                        <div class="feature-icon">🏦</div>
+                        <div class="feature-title">Payment Processing</div>
+                        <div class="feature-desc">Stripe + local gateways</div>
+                    </div>
+                    <div class="feature">
+                        <div class="feature-icon">📋</div>
+                        <div class="feature-title">Government Systems</div>
+                        <div class="feature-desc">LPIS + subsidy data</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Modules Tab -->
+        <div id="modules" class="tab-content">
+            <div class="layer">
+                <div class="layer-title">6 Core Modules</div>
+                <div class="modules-grid">
+                    <div class="module" onclick="selectModule(this, 'agro')">
+                        <div class="module-name">FMIS.Agro</div>
+                        <div class="module-label">Production Planning ERP</div>
+                    </div>
+                    <div class="module" onclick="selectModule(this, 'monitor')">
+                        <div class="module-name">FMIS.Monitor</div>
+                        <div class="module-label">Satellite + IoT</div>
+                    </div>
+                    <div class="module livestock" onclick="selectModule(this, 'livestock')">
+                        <div class="module-name">FMIS.Livestock</div>
+                        <div class="module-label">Veterinary AI</div>
+                    </div>
+                    <div class="module equipment" onclick="selectModule(this, 'equipment')">
+                        <div class="module-name">FMIS.Equipment</div>
+                        <div class="module-label">P2P Marketplace</div>
+                    </div>
+                    <div class="module helpdesk" onclick="selectModule(this, 'helpdesk')">
+                        <div class="module-name">FMIS.AI-Helpdesk</div>
+                        <div class="module-label">24/7 Advisory</div>
+                    </div>
+                    <div class="module market" onclick="selectModule(this, 'market')">
+                        <div class="module-name">FMIS.Market-Access</div>
+                        <div class="module-label">B2B + B2C</div>
+                    </div>
+                </div>
+            </div>
+            
+            <div id="moduleDetails" class="layer" style="margin-top: 20px;">
+                <div class="layer-title" id="selectedModuleTitle">FMIS.Agro — Production Planning ERP</div>
+                <div class="module-details" id="selectedModuleDesc">
+                    <strong>Parcel-level 90-day production planning</strong><br>
+                    • Demand forecasting (yield prediction)<br>
+                    • Master production schedule (weekly timeline)<br>
+                    • Material requirements (seed, fertilizer, pesticide)<br>
+                    • Capacity planning (labor, equipment)<br>
+                    • Cost accounting (budget tracking)<br>
+                    • Daily companion (discipline enforcement)<br>
+                    <br>
+                    <strong>Target Result:</strong> +20% yield, -15% costs, 96% plan adherence
+                </div>
+            </div>
+        </div>
+        
+        <!-- Daily Companion Tab -->
+        <div id="daily" class="tab-content">
+            <div class="layer">
+                <div class="layer-title">Daily Companion Discipline System</div>
+                <p style="color: var(--text-secondary); font-size: 13px; margin-bottom: 15px;">
+                    Ensures farmer compliance through structured daily engagement + blockchain logging
+                </p>
+                
+                <div class="companion-timeline">
+                    <div class="time-block">
+                        <div class="time-label">🌅 Morning</div>
+                        <div class="time-action">
+                            <strong>Briefing</strong><br>
+                            Today's tasks, weather alerts, advisor tips
+                        </div>
+                    </div>
+                    <div class="time-block">
+                        <div class="time-label">📍 Midday</div>
+                        <div class="time-action">
+                            <strong>Field Check</strong><br>
+                            Photo upload, task status, observations
+                        </div>
+                    </div>
+                    <div class="time-block">
+                        <div class="time-label">📝 Evening</div>
+                        <div class="time-action">
+                            <strong>Report</strong><br>
+                            Day summary, inputs used, results
+                        </div>
+                    </div>
+                    <div class="time-block">
+                        <div class="time-label">🔐 Lock</div>
+                        <div class="time-action">
+                            <strong>Blockchain</strong><br>
+                            Day sealed in immutable ledger
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="module-details" style="margin-top: 20px;">
+                    <strong>Result:</strong> 96% plan adherence (vs 70% intuition-based)<br>
+                    <strong>Farmer Benefit:</strong> Consistent execution → predictable yields<br>
+                    <strong>Platform Benefit:</strong> Verified data for AI model training + proof of work
+                </div>
+            </div>
+        </div>
+        
+        <!-- Ecosystem Tab -->
+        <div id="ecosystem" class="tab-content">
+            <div class="layer">
+                <div class="layer-title">Multi-Stakeholder Ecosystem</div>
+                <p style="color: var(--text-secondary); font-size: 13px; margin-bottom: 20px;">
+                    Network effects: Farmers → Experts → B2B/B2C buyers create defensible moat
+                </p>
+                
+                <div class="ecosystem-box">
+                    <div class="ecosystem-title">🌾 Farmer Segment</div>
+                    <div class="ecosystem-items">
+                        <div class="ecosystem-item farmer">Production planning</div>
+                        <div class="ecosystem-item farmer">Real-time monitoring</div>
+                        <div class="ecosystem-item farmer">Expert access</div>
+                        <div class="ecosystem-item farmer">Equipment rental</div>
+                        <div class="ecosystem-item farmer">Premium pricing</div>
+                    </div>
+                </div>
+                
+                <div class="ecosystem-box">
+                    <div class="ecosystem-title">👨‍💼 Expert Consultant Segment</div>
+                    <div class="ecosystem-items">
+                        <div class="ecosystem-item expert">300+ verified agronomists</div>
+                        <div class="ecosystem-item expert">Project-based pricing</div>
+                        <div class="ecosystem-item expert">10x farmer reach</div>
+                        <div class="ecosystem-item expert">480K-1.5M TL/year income</div>
+                    </div>
+                </div>
+                
+                <div class="ecosystem-box">
+                    <div class="ecosystem-title">🏪 B2B Segment (Food Companies)</div>
+                    <div class="ecosystem-items">
+                        <div class="ecosystem-item b2b">Direct farmer sourcing</div>
+                        <div class="ecosystem-item b2b">Quality verified</div>
+                        <div class="ecosystem-item b2b">-10% supplier cost</div>
+                        <div class="ecosystem-item b2b">Blockchain traceability</div>
+                    </div>
+                </div>
+                
+                <div class="ecosystem-box">
+                    <div class="ecosystem-title">👥 B2C Segment (Consumers)</div>
+                    <div class="ecosystem-items">
+                        <div class="ecosystem-item b2c">QR code traceability</div>
+                        <div class="ecosystem-item b2c">Farm-to-table transparency</div>
+                        <div class="ecosystem-item b2c">+20-30% price premium</div>
+                        <div class="ecosystem-item b2c">Verified sustainability</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Data Flow Tab -->
+        <div id="dataflow" class="tab-content">
+            <div class="flow-diagram">
+                <div class="layer-title">Data Journey Through Platform</div>
+                
+                <div class="flow-step">
+                    <div class="flow-icon">👨‍🌾</div>
+                    <div class="flow-content">
+                        <div class="flow-title">1. Farmer Input</div>
+                        <div class="flow-desc">Daily observations, task completions, manual measurements via mobile/web/voice</div>
+                    </div>
+                </div>
+                
+                <div class="flow-arrow">↓</div>
+                
+                <div class="flow-step">
+                    <div class="flow-icon">🔄</div>
+                    <div class="flow-content">
+                        <div class="flow-title">2. Data Aggregation</div>
+                        <div class="flow-desc">Validation + sensor fusion (IoT + satellite + weather) + anomaly detection</div>
+                    </div>
+                </div>
+                
+                <div class="flow-arrow">↓</div>
+                
+                <div class="flow-step">
+                    <div class="flow-icon">🤖</div>
+                    <div class="flow-content">
+                        <div class="flow-title">3. AI Processing</div>
+                        <div class="flow-desc">Yield prediction, risk assessment, disease detection (CNN), recommendations</div>
+                    </div>
+                </div>
+                
+                <div class="flow-arrow">↓</div>
+                
+                <div class="flow-step">
+                    <div class="flow-icon">⛓️</div>
+                    <div class="flow-content">
+                        <div class="flow-title">4. Blockchain Storage</div>
+                        <div class="flow-desc">Immutable daily hash, quality verification, digital signatures, audit trail</div>
+                    </div>
+                </div>
+                
+                <div class="flow-arrow">↓</div>
+                
+                <div class="flow-step">
+                    <div class="flow-icon">📊</div>
+                    <div class="flow-content">
+                        <div class="flow-title">5. Output Layer</div>
+                        <div class="flow-desc">Farmer dashboard, Dr. Koçak reports, B2C QR traceability, B2B data feeds</div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="layer">
+                <div class="layer-title">Technology Stack</div>
+                <div class="features-grid">
+                    <div class="feature">
+                        <div class="feature-icon">💾</div>
+                        <div class="feature-title">Backend</div>
+                        <div class="feature-desc">Python, Node.js, Go<br>PostgreSQL, MongoDB, Redis</div>
+                    </div>
+                    <div class="feature">
+                        <div class="feature-icon">🎨</div>
+                        <div class="feature-title">Frontend</div>
+                        <div class="feature-desc">React.js + TypeScript<br>React Native (iOS/Android)</div>
+                    </div>
+                    <div class="feature">
+                        <div class="feature-icon">🧠</div>
+                        <div class="feature-title">AI/ML</div>
+                        <div class="feature-desc">TensorFlow 2.x<br>Google Earth Engine, Hugging Face</div>
+                    </div>
+                    <div class="feature">
+                        <div class="feature-icon">☁️</div>
+                        <div class="feature-title">Cloud</div>
+                        <div class="feature-desc">AWS (EC2, Lambda, RDS)<br>Docker, Kubernetes</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        const moduleData = {
+            agro: {
+                title: 'FMIS.Agro — Production Planning ERP',
+                desc: '<strong>Parcel-level 90-day production planning</strong><br>• Demand forecasting (yield prediction)<br>• Master production schedule (weekly timeline)<br>• Material requirements (seed, fertilizer, pesticide)<br>• Capacity planning (labor, equipment)<br>• Cost accounting (budget tracking)<br>• Daily companion (discipline enforcement)<br><br><strong>Target Result:</strong> +20% yield, -15% costs, 96% plan adherence'
+            },
+            monitor: {
+                title: 'FMIS.Monitor — Satellite + IoT Monitoring',
+                desc: '<strong>Real-time crop health monitoring</strong><br>• Uydu NDVI (weekly vegetation health)<br>• Weather alerts (rain forecast, frost warning)<br>• IoT sensors (soil moisture, temperature)<br>• Disease detection (CNN-based image analysis)<br>• Risk scoring (fungal/insect/water stress)<br><br><strong>Target Result:</strong> Disease detection 72 hours early, up to 90% prevention rate'
+            },
+            livestock: {
+                title: 'FMIS.Livestock — Veterinary AI',
+                desc: '<strong>Livestock management & monitoring</strong><br>• Wearable monitoring (health sensors)<br>• AI diagnosis (vet problem identification)<br>• Productivity tracking (milk yield, eggs)<br>• Automated alerts (health, productivity)<br>• Veteriner network (consultation)<br><br><strong>Target Result:</strong> -30% vet costs, +15% productivity'
+            },
+            equipment: {
+                title: 'FMIS.Equipment — P2P Marketplace',
+                desc: '<strong>Peer-to-peer equipment rental</strong><br>• Equipment registry (tractor, harvester, sprayer)<br>• Availability matching (regional)<br>• Booking system (date/time scheduling)<br>• Payment processing (secure, escrow)<br>• Quality rating (condition, reliability)<br>• Insurance integration (damage coverage)<br><br><strong>Target Result:</strong> +40% utilization, -20% farmer equipment costs'
+            },
+            helpdesk: {
+                title: 'FMIS.AI-Helpdesk — 24/7 Advisory',
+                desc: '<strong>Automated + expert advisory service</strong><br>• AI chatbot (common Q&A, instant response)<br>• Expert escalation (complex questions → human)<br>• Knowledge base (1000+ articles)<br>• Expert connection (matching to advisors)<br>• Bilgi dissemination (education content)<br><br><strong>Result:</strong> Advisory access 24-hour → 2-hour response'
+            },
+            market: {
+                title: 'FMIS.Market-Access — B2B/B2C Commerce',
+                desc: '<strong>Direct market access (middleman elimination)</strong><br><strong>B2B:</strong> Food company direct sourcing, quality specs, blockchain tracking<br><strong>B2C:</strong> QR code traceability, premium marketplace, consumer reviews<br><br><strong>Target Result:</strong> Middleman eliminated, +20-30% price premium for farmers'
+            }
+        };
+        
+        function switchTab(tabName) {
+            // Hide all tabs
+            document.querySelectorAll('.tab-content').forEach(tab => {
+                tab.classList.remove('active');
+            });
+            
+            // Remove active from all buttons
+            document.querySelectorAll('.tab-btn').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            
+            // Show selected tab
+            document.getElementById(tabName).classList.add('active');
+            event.target.classList.add('active');
+        }
+        
+        function selectModule(element, module) {
+            // Remove active from all modules
+            document.querySelectorAll('.module').forEach(m => {
+                m.classList.remove('active');
+            });
+            
+            // Add active to clicked module
+            element.classList.add('active');
+            
+            // Update details
+            const data = moduleData[module];
+            document.getElementById('selectedModuleTitle').textContent = data.title;
+            document.getElementById('selectedModuleDesc').innerHTML = data.desc;
+        }
+        
+        // Set first module as active on load
+        window.addEventListener('load', () => {
+            document.querySelector('.module').click();
+        });
+    </script>
+</body>
+</html>

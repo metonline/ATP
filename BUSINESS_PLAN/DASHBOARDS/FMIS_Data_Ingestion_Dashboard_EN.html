@@ -1,0 +1,455 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FMIS Data Ingestion Architecture - Dashboard</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background: linear-gradient(135deg, #f9fafb 0%, #f3f4f6 100%);
+            color: #1f2937;
+            padding: 20px;
+        }
+        .container { max-width: 1400px; margin: 0 auto; }
+        .header { text-align: center; margin-bottom: 40px; }
+        .header h1 { font-size: 32px; margin-bottom: 8px; }
+        .header p { font-size: 15px; color: #6b7280; }
+        .tabs {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 30px;
+            border-bottom: 1px solid #e5e7eb;
+            flex-wrap: wrap;
+        }
+        .tab-btn {
+            padding: 12px 20px;
+            border: none;
+            background: transparent;
+            color: #6b7280;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 600;
+            border-bottom: 3px solid transparent;
+            transition: all 0.2s;
+        }
+        .tab-btn.active {
+            color: #3b82f6;
+            border-bottom-color: #3b82f6;
+        }
+        .tab-content {
+            display: none;
+        }
+        .tab-content.active {
+            display: block;
+        }
+        .channels-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+        .channel-card {
+            background: white;
+            border-radius: 8px;
+            padding: 24px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            border-left: 4px solid;
+            transition: all 0.3s;
+        }
+        .channel-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        }
+        .channel-card.voice { border-left-color: #3b82f6; }
+        .channel-card.image { border-left-color: #ef4444; }
+        .channel-card.video { border-left-color: #8b5cf6; }
+        .channel-card.manual { border-left-color: #f59e0b; }
+        .channel-card.text { border-left-color: #06b6d4; }
+        .channel-card.sensors { border-left-color: #10b981; }
+        .channel-card.ar { border-left-color: #ec4899; }
+        .channel-icon {
+            font-size: 32px;
+            margin-bottom: 12px;
+        }
+        .channel-title {
+            font-size: 18px;
+            font-weight: 700;
+            margin-bottom: 8px;
+        }
+        .channel-desc {
+            font-size: 13px;
+            color: #6b7280;
+            margin-bottom: 12px;
+        }
+        .channel-features {
+            font-size: 12px;
+            color: #9ca3af;
+        }
+        .channel-features li {
+            margin-left: 20px;
+            margin-bottom: 4px;
+        }
+        .section {
+            background: white;
+            border-radius: 8px;
+            padding: 30px;
+            margin-bottom: 30px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+        .section-title {
+            font-size: 20px;
+            font-weight: 700;
+            margin-bottom: 24px;
+        }
+        .steps {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 16px;
+        }
+        .step {
+            background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%);
+            border: 1px solid #bae6fd;
+            border-radius: 6px;
+            padding: 16px;
+            text-align: center;
+        }
+        .step-number {
+            display: inline-block;
+            background: #3b82f6;
+            color: white;
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            line-height: 32px;
+            font-weight: 700;
+            margin-bottom: 8px;
+        }
+        .step-name {
+            font-size: 13px;
+            font-weight: 600;
+        }
+        .step-desc {
+            font-size: 11px;
+            color: #6b7280;
+            margin-top: 4px;
+        }
+        .modules-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 15px;
+        }
+        .module {
+            background: linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%);
+            border: 1px solid #93c5fd;
+            border-radius: 6px;
+            padding: 16px;
+            text-align: center;
+        }
+        .module-icon {
+            font-size: 24px;
+            margin-bottom: 8px;
+        }
+        .module-name {
+            font-size: 12px;
+            font-weight: 700;
+        }
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin-top: 20px;
+        }
+        .stat-card {
+            background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%);
+            border: 1px solid #86efac;
+            border-radius: 6px;
+            padding: 20px;
+        }
+        .stat-label {
+            font-size: 12px;
+            color: #6b7280;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 8px;
+        }
+        .stat-value {
+            font-size: 28px;
+            font-weight: 700;
+            color: #10b981;
+        }
+        .stat-desc {
+            font-size: 12px;
+            color: #6b7280;
+            margin-top: 8px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>FMIS: Multi-Modal Data Ingestion Architecture</h1>
+            <p>Farmer-Centric ERP — Platform Accepts All Data Types</p>
+        </div>
+
+        <div class="tabs">
+            <button class="tab-btn active" onclick="switchTab('channels')">🔌 Data Channels</button>
+            <button class="tab-btn" onclick="switchTab('processing')">⚙️ Processing Engine</button>
+            <button class="tab-btn" onclick="switchTab('modules')">📊 ERP Modules</button>
+            <button class="tab-btn" onclick="switchTab('flow')">🔄 Data Flow</button>
+            <button class="tab-btn" onclick="switchTab('impact')">📈 Impact</button>
+        </div>
+
+        <!-- CHANNELS TAB -->
+        <div id="channels" class="tab-content active">
+            <div class="channels-grid">
+                <div class="channel-card voice">
+                    <div class="channel-icon">🎙️</div>
+                    <div class="channel-title">Voice</div>
+                    <div class="channel-desc">STT + NLP</div>
+                    <ul class="channel-features">
+                        <li>Command recognition</li>
+                        <li>Note taking</li>
+                        <li>Report dictation</li>
+                        <li>Turkish support</li>
+                    </ul>
+                </div>
+
+                <div class="channel-card image">
+                    <div class="channel-icon">📸</div>
+                    <div class="channel-title">Image</div>
+                    <div class="channel-desc">OCR + Computer Vision</div>
+                    <ul class="channel-features">
+                        <li>Invoice scanning</li>
+                        <li>Disease diagnosis</li>
+                        <li>Quality control</li>
+                        <li>QR code reading</li>
+                    </ul>
+                </div>
+
+                <div class="channel-card video">
+                    <div class="channel-icon">🎬</div>
+                    <div class="channel-title">Video</div>
+                    <div class="channel-desc">Action Recognition</div>
+                    <ul class="channel-features">
+                        <li>Field walkthrough</li>
+                        <li>Harvest process</li>
+                        <li>Machine analysis</li>
+                        <li>Drone footage</li>
+                    </ul>
+                </div>
+
+                <div class="channel-card manual">
+                    <div class="channel-icon">✍️</div>
+                    <div class="channel-title">Manual</div>
+                    <div class="channel-desc">Form, Calendar, List</div>
+                    <ul class="channel-features">
+                        <li>Mobile form</li>
+                        <li>Web form</li>
+                        <li>Calendar planning</li>
+                        <li>Drag-drop</li>
+                    </ul>
+                </div>
+
+                <div class="channel-card text">
+                    <div class="channel-icon">💬</div>
+                    <div class="channel-title">Text</div>
+                    <div class="channel-desc">SMS, WhatsApp, Email</div>
+                    <ul class="channel-features">
+                        <li>SMS commands</li>
+                        <li>WhatsApp integration</li>
+                        <li>Email documents</li>
+                        <li>Telegram bot</li>
+                    </ul>
+                </div>
+
+                <div class="channel-card sensors">
+                    <div class="channel-icon">🔌</div>
+                    <div class="channel-title">Sensors</div>
+                    <div class="channel-desc">IoT, Satellite, Weather</div>
+                    <ul class="channel-features">
+                        <li>Soil sensors</li>
+                        <li>Satellite imagery</li>
+                        <li>Weather data</li>
+                        <li>GPS tracking</li>
+                    </ul>
+                </div>
+
+                <div class="channel-card ar">
+                    <div class="channel-icon">🥽</div>
+                    <div class="channel-title">AR</div>
+                    <div class="channel-desc">Real-time Diagnosis</div>
+                    <ul class="channel-features">
+                        <li>Live disease scan</li>
+                        <li>Quality analysis</li>
+                        <li>Technical overlay</li>
+                        <li>3D models</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+        <!-- PROCESSING TAB -->
+        <div id="processing" class="tab-content">
+            <div class="section">
+                <div class="section-title">Smart Data Processing Engine</div>
+                <div class="steps">
+                    <div class="step">
+                        <div class="step-number">1</div>
+                        <div class="step-name">Extraction</div>
+                        <div class="step-desc">Extract from all sources</div>
+                    </div>
+                    <div class="step">
+                        <div class="step-number">2</div>
+                        <div class="step-name">Normalization</div>
+                        <div class="step-desc">Standardize & unify</div>
+                    </div>
+                    <div class="step">
+                        <div class="step-number">3</div>
+                        <div class="step-name">Fusion</div>
+                        <div class="step-desc">Multi-modal combine</div>
+                    </div>
+                    <div class="step">
+                        <div class="step-number">4</div>
+                        <div class="step-name">Validation</div>
+                        <div class="step-desc">Quality check</div>
+                    </div>
+                    <div class="step">
+                        <div class="step-number">5</div>
+                        <div class="step-name">Categorization</div>
+                        <div class="step-desc">Auto-categorize</div>
+                    </div>
+                </div>
+
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <div class="stat-label">Accuracy</div>
+                        <div class="stat-value">95%+</div>
+                        <div class="stat-desc">Auto-categorization</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-label">Processing Time</div>
+                        <div class="stat-value">&lt;30 min</div>
+                        <div class="stat-desc">Voice → Action</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-label">Data Types</div>
+                        <div class="stat-value">7+</div>
+                        <div class="stat-desc">Multi-modal support</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-label">Reliability</div>
+                        <div class="stat-value">90%</div>
+                        <div class="stat-desc">Video + Sensor</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- MODULES TAB -->
+        <div id="modules" class="tab-content">
+            <div class="section">
+                <div class="section-title">FMIS ERP Modules</div>
+                <p style="color: #6b7280; margin-bottom: 20px;">Standardized data feeds these modules:</p>
+                <div class="modules-grid">
+                    <div class="module">
+                        <div class="module-icon">🌾</div>
+                        <div class="module-name">FMIS.Agro</div>
+                        <div style="font-size: 11px; color: #6b7280; margin-top: 4px;">Production Planning</div>
+                    </div>
+                    <div class="module">
+                        <div class="module-icon">📋</div>
+                        <div class="module-name">FMIS.Operations</div>
+                        <div style="font-size: 11px; color: #6b7280; margin-top: 4px;">Daily Tasks</div>
+                    </div>
+                    <div class="module">
+                        <div class="module-icon">💰</div>
+                        <div class="module-name">FMIS.Finance</div>
+                        <div style="font-size: 11px; color: #6b7280; margin-top: 4px;">Accounting & ROI</div>
+                    </div>
+                    <div class="module">
+                        <div class="module-icon">📦</div>
+                        <div class="module-name">FMIS.Inventory</div>
+                        <div style="font-size: 11px; color: #6b7280; margin-top: 4px;">Storage & Input</div>
+                    </div>
+                    <div class="module">
+                        <div class="module-icon">🛒</div>
+                        <div class="module-name">FMIS.Marketplace</div>
+                        <div style="font-size: 11px; color: #6b7280; margin-top: 4px;">Harvest & Sales</div>
+                    </div>
+                    <div class="module">
+                        <div class="module-icon">💡</div>
+                        <div class="module-name">FMIS.Advisory</div>
+                        <div style="font-size: 11px; color: #6b7280; margin-top: 4px;">Advisors & AI</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- FLOW TAB -->
+        <div id="flow" class="tab-content">
+            <div class="section">
+                <div class="section-title">Data Flow: Source → Processing → Output</div>
+                <div style="background: #f0fdf4; border-left: 4px solid #10b981; border-radius: 4px; padding: 20px; margin-top: 20px;">
+                    <div style="font-weight: 600; margin-bottom: 8px;">Result:</div>
+                    <div style="color: #6b7280;">Farmer never opens a computer, yet runs a complete farm management system (ERP). Tangible benefits: better harvest, lower costs, higher profit.</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- IMPACT TAB -->
+        <div id="impact" class="tab-content">
+            <div class="section">
+                <div class="section-title">Platform Impact</div>
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <div class="stat-label">Data Entry Speed</div>
+                        <div class="stat-value">&lt;5 min</div>
+                        <div class="stat-desc">Daily operations log</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-label">Automation</div>
+                        <div class="stat-value">90%</div>
+                        <div class="stat-desc">Categorized data</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-label">Decision Speed</div>
+                        <div class="stat-value">50%↓</div>
+                        <div class="stat-desc">Data-driven decisions</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-label">Cost Reduction</div>
+                        <div class="stat-value">15%↓</div>
+                        <div class="stat-desc">Operational savings</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-label">Revenue Growth</div>
+                        <div class="stat-value">20%↑</div>
+                        <div class="stat-desc">Margin improvement</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-label">User Satisfaction</div>
+                        <div class="stat-value">4.5/5</div>
+                        <div class="stat-desc">NPS &gt;70</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function switchTab(tabName) {
+            document.querySelectorAll('.tab-content').forEach(tab => {
+                tab.classList.remove('active');
+            });
+            document.querySelectorAll('.tab-btn').forEach(btn => {
+                btn.classList.remove('active');
+            });
+
+            document.getElementById(tabName).classList.add('active');
+            event.target.classList.add('active');
+        }
+    </script>
+</body>
+</html>
