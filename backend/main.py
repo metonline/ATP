@@ -250,7 +250,7 @@ async def login(credentials: FarmerLogin, db: Session = Depends(get_db)):
 # FARMER PROFILE
 # ============================================================================
 
-@app.get("/api/farmer/profile", response_model=FarmerProfile)
+@app.get("/api/auth/profile", response_model=FarmerProfile)
 async def get_profile(
     authorization: Optional[str] = Header(None),
     db: Session = Depends(get_db)
@@ -261,7 +261,7 @@ async def get_profile(
     return farmer
 
 
-@app.put("/api/farmer/profile")
+@app.put("/api/auth/profile")
 async def update_profile(
     farm_size_hectares: Optional[float] = None,
     primary_crops: Optional[str] = None,
@@ -678,6 +678,42 @@ async def get_satellite_image(parcel_id: int, db: Session = Depends(get_db)):
         }
     except Exception as e:
         return {"error": str(e)}
+
+
+
+
+
+
+
+
+@app.get("/api/auth/profile")
+async def get_profile(
+    authorization: Optional[str] = Header(None),
+    db: Session = Depends(get_db)
+):
+    token = extract_token_from_header(authorization)
+    farmer = get_current_farmer(token, db)
+    return {
+        "id": farmer.id,
+        "username": farmer.username,
+        "full_name": farmer.full_name,
+        "phone": farmer.phone
+    }
+
+@app.post("/api/auth/change-password")
+async def change_password(
+    old_password: str,
+    new_password: str,
+    authorization: Optional[str] = Header(None),
+    db: Session = Depends(get_db)
+):
+    token = extract_token_from_header(authorization)
+    farmer = get_current_farmer(token, db)
+    if not verify_password(old_password, farmer.password_hash):
+        raise HTTPException(status_code=400, detail="Eski şifre yanlış")
+    farmer.password_hash = get_password_hash(new_password)
+    db.commit()
+    return {"message": "Şifre başarıyla değiştirildi"}
 
 
 
