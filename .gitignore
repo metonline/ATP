@@ -5,3 +5,6 @@ __pycache__/
 *.pyc
 .env
 venv/
+backend/renta-key.json
+.env
+*.key
