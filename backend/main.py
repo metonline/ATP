@@ -623,11 +623,21 @@ def initialize_earth_engine():
     interaktif tarayıcı girişine ihtiyaç duymaz. Dosya yoksa (örn. eski
     yerel kurulum), ee.Authenticate()'ten kalma kişisel oturuma düşer.
     """
+    print(f'🔍 [EE-INIT] EE_KEY_PATH = {EE_KEY_PATH}')
+    print(f'🔍 [EE-INIT] os.path.exists(EE_KEY_PATH) = {os.path.exists(EE_KEY_PATH)}')
+    print(f'🔍 [EE-INIT] EE_SERVICE_ACCOUNT_KEY env var = {os.getenv("EE_SERVICE_ACCOUNT_KEY")}')
+    try:
+        print(f'🔍 [EE-INIT] /etc/secrets içeriği: {os.listdir("/etc/secrets")}')
+    except Exception as list_err:
+        print(f'🔍 [EE-INIT] /etc/secrets listelenemedi: {list_err}')
+
     if os.path.exists(EE_KEY_PATH):
+        print('🔍 [EE-INIT] Service account key bulundu, ServiceAccountCredentials deneniyor...')
         credentials = ee.ServiceAccountCredentials(EE_SERVICE_ACCOUNT, EE_KEY_PATH)
         ee.Initialize(credentials, project='renta-platform-505621')
+        print('🔍 [EE-INIT] Service account ile başarıyla initialize edildi.')
     else:
-        print(f'⚠ {EE_KEY_PATH} bulunamadı, kişisel ee.Authenticate() oturumuna düşülüyor')
+        print(f'⚠ [EE-INIT] {EE_KEY_PATH} bulunamadı, kişisel ee.Authenticate() oturumuna düşülüyor')
         ee.Initialize(project='renta-platform-505621')
 
 
