@@ -612,6 +612,25 @@ async def fetch_satellite_image(parcel_id: int, background_tasks: BackgroundTask
     background_tasks.add_task(fetch_satellite_bg, parcel_id, parcel.centroid_lat, parcel.centroid_lon)
     return {"status": "Fetching satellite image...", "parcel_id": parcel_id}
 
+EE_SERVICE_ACCOUNT = "atp-976@renta-platform-505621.iam.gserviceaccount.com"
+EE_KEY_PATH = os.getenv("EE_SERVICE_ACCOUNT_KEY", str(Path(__file__).parent / "renta-key.json"))
+
+
+def initialize_earth_engine():
+    """
+    Earth Engine'i başlatır. renta-key.json (service account) varsa onu
+    kullanır — hem yerelde hem sunucuda (Render vb.) aynı şekilde çalışır,
+    interaktif tarayıcı girişine ihtiyaç duymaz. Dosya yoksa (örn. eski
+    yerel kurulum), ee.Authenticate()'ten kalma kişisel oturuma düşer.
+    """
+    if os.path.exists(EE_KEY_PATH):
+        credentials = ee.ServiceAccountCredentials(EE_SERVICE_ACCOUNT, EE_KEY_PATH)
+        ee.Initialize(credentials, project='renta-platform-505621')
+    else:
+        print(f'⚠ {EE_KEY_PATH} bulunamadı, kişisel ee.Authenticate() oturumuna düşülüyor')
+        ee.Initialize(project='renta-platform-505621')
+
+
 def get_ee_session() -> AuthorizedSession:
     """
     EE thumbnail URL'leri authenticated bir istek gerektiriyor.
@@ -678,7 +697,7 @@ def fetch_satellite_bg(parcel_id: int, lat: float, lng: float):
         db.add(sat_image)
         db.commit()
         
-        ee.Initialize(project='renta-platform-505621')
+        initialize_earth_engine()
         
         geometry = ee.Geometry.Point([lng, lat])
         # SR_HARMONIZED = atmosfer düzeltmeli surface reflectance.
