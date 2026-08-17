@@ -93,6 +93,9 @@ class SatelliteImage(Base):
     status = Column(String, default="pending")
     error_message = Column(String, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
+    # NDVI (bitki sağlığı indeksi) alanları
+    mean_ndvi = Column(Float, nullable=True)  # Parselin ortalama NDVI değeri (-1..1)
+    ndvi_url = Column(String, nullable=True)  # Renklendirilmiş NDVI haritasının EE thumbnail URL'i
 
 def get_db():
     db = SessionLocal()

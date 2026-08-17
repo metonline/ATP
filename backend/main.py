@@ -7,6 +7,9 @@ import ee
 from fastapi import FastAPI, BackgroundTasks, Depends, HTTPException, status, UploadFile, Header
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
+from fastapi.responses import Response
+import google.auth
+from google.auth.transport.requests import AuthorizedSession
 from sqlalchemy.orm import Session
 from pydantic import BaseModel, EmailStr
 from datetime import datetime, timedelta
@@ -15,6 +18,8 @@ import jwt
 import os
 import sys
 import logging
+import time
+from pathlib import Path
 
 logging.basicConfig(level=logging.INFO, stream=sys.stdout, format='%(message)s')
 
@@ -579,6 +584,61 @@ async def fetch_satellite_image(parcel_id: int, background_tasks: BackgroundTask
     background_tasks.add_task(fetch_satellite_bg, parcel_id, parcel.centroid_lat, parcel.centroid_lon)
     return {"status": "Fetching satellite image...", "parcel_id": parcel_id}
 
+def get_ee_session() -> AuthorizedSession:
+    """
+    EE thumbnail URL'leri (getThumbURL) authenticated bir istek gerektiriyor.
+    ee.Initialize()'ın kullandığı aynı Application Default Credentials
+    (renta-key.json service account) ile authorized bir requests session döner.
+    """
+    credentials, _ = google.auth.default(
+        scopes=['https://www.googleapis.com/auth/cloud-platform']
+    )
+    return AuthorizedSession(credentials)
+
+
+# --- Kalıcı uydu görüntüsü depolama ---
+# EE'nin getThumbURL() ile döndürdüğü linkler SÜRELİ/geçici imzalı URL'lerdir,
+# bir süre sonra geçersiz kalıp kırık görüntüye sebep olur. Bunu önlemek için
+# fetch anında bytes'ı kendimiz indirip diskte kalıcı olarak saklıyoruz ve
+# DB'ye EE linki yerine kendi sabit URL'imizi yazıyoruz.
+SATELLITE_IMAGE_DIR = Path(__file__).parent / "satellite_images"
+SATELLITE_IMAGE_DIR.mkdir(exist_ok=True)
+
+BACKEND_BASE_URL = os.getenv("BACKEND_BASE_URL", "http://localhost:8000")
+
+app.mount("/satellite-static", StaticFiles(directory=str(SATELLITE_IMAGE_DIR)), name="satellite_static")
+
+
+def save_ee_thumbnail(ee_url: str, filename: str) -> str:
+    """EE thumbnail'ini authenticated şekilde indirip diske kaydeder, kalıcı/sabit public URL döner."""
+    session = get_ee_session()
+    resp = session.get(ee_url, timeout=30)
+    resp.raise_for_status()
+    filepath = SATELLITE_IMAGE_DIR / filename
+    filepath.write_bytes(resp.content)
+    return f"{BACKEND_BASE_URL}/satellite-static/{filename}"
+
+
+def cleanup_old_satellite_images(parcel_id: int, keep: int = 3):
+    """
+    Parsel başına eski görüntü dosyalarının diskte sınırsız birikmesini önler
+    (mgbric.info'daki 816 dosya / ~103GB disk krizi burada tekrarlanmasın diye).
+    Her fetch sonrası çağrılır, sadece en yeni `keep` kadar dosyayı tutar.
+    """
+    for suffix in ("rgb", "ndvi"):
+        pattern = f"parcel_{parcel_id}_*_{suffix}.png"
+        files = sorted(
+            SATELLITE_IMAGE_DIR.glob(pattern),
+            key=lambda p: p.stat().st_mtime,
+            reverse=True
+        )
+        for old_file in files[keep:]:
+            try:
+                old_file.unlink()
+            except Exception as cleanup_err:
+                print(f'⚠ Eski dosya silinemedi ({old_file.name}): {cleanup_err}')
+
+
 def fetch_satellite_bg(parcel_id: int, lat: float, lng: float):
     """Background: Sentinel-2 uydu görüntüsünü indir"""
     from database import SessionLocal, SatelliteImage
@@ -593,7 +653,10 @@ def fetch_satellite_bg(parcel_id: int, lat: float, lng: float):
         ee.Initialize(project='renta-platform-505621')
         
         geometry = ee.Geometry.Point([lng, lat])
-        image = ee.ImageCollection('COPERNICUS/S2_HARMONIZED')\
+        # SR_HARMONIZED = atmosfer düzeltmeli surface reflectance.
+        # S2_HARMONIZED (TOA) atmosferik saçılma yüzünden renk kaymasına
+        # (pembe/eflatun ton) sebep oluyordu.
+        image = ee.ImageCollection('COPERNICUS/S2_SR_HARMONIZED')\
             .filterBounds(geometry)\
             .filterDate('2026-06-01', '2026-08-15')\
             .filter(ee.Filter.lt('CLOUDY_PIXEL_PERCENTAGE', 30))\
@@ -607,12 +670,78 @@ def fetch_satellite_bg(parcel_id: int, lat: float, lng: float):
             geom_dict = json.loads(parcel.geometry_geojson)
             parcel_geometry = ee.Geometry(geom_dict)
             
+            # Küçük parsellerde 10m'lik pikseller thumbnail'de kocaman/bloklu
+            # görünüyor; bicubic resample bunu yumuşatıyor.
+            smoothed = image.resample('bicubic')
+            
             # Image'ı parsel sınırlarıyla kırp
-            clipped = image.clip(parcel_geometry)
+            clipped = smoothed.clip(parcel_geometry)
             
             # RGB channels seç
             rgb = clipped.select(['B4', 'B3', 'B2'])
-            url = rgb.getThumbURL({'min': 0, 'max': 3000, 'dimensions': 512})
+
+            # Sabit min/max yerine, parselin kendi piksel değerlerinden
+            # %2-%98 percentile aralığını hesaplayıp otomatik "doğru pozlama"
+            # elde ediyoruz. Mevsim/toprak/ışık koşuluna göre her seferinde
+            # kendini ayarlıyor, elle sabit sayı tutmamıza gerek kalmıyor.
+            try:
+                stats = rgb.reduceRegion(
+                    reducer=ee.Reducer.percentile([2, 98]),
+                    geometry=parcel_geometry,
+                    scale=10,
+                    maxPixels=1e9
+                ).getInfo()
+                band_min = min(v for k, v in stats.items() if k.endswith('_p2') and v is not None)
+                band_max = max(v for k, v in stats.items() if k.endswith('_p98') and v is not None)
+            except Exception as stat_err:
+                print(f'⚠ Percentile stretch hesaplanamadı, sabit değerlere düşülüyor: {stat_err}')
+                band_min, band_max = 0, 3000
+
+            url_ee = rgb.getThumbURL({
+                'min': band_min,
+                'max': band_max,
+                'gamma': 1.4,
+                'dimensions': 1024,  # 512'den yükseltildi: UI'da daha büyük/pürüzsüz görünüm
+                'format': 'png'
+            })
+
+            # --- NDVI (bitki sağlığı indeksi) ---
+            # NDVI = (NIR - Red) / (NIR + Red) = (B8 - B4) / (B8 + B4)
+            # normalizedDifference(['B8','B4']) tam olarak bunu hesaplıyor.
+            ndvi = clipped.normalizedDifference(['B8', 'B4']).rename('NDVI')
+
+            # Parselin ortalama NDVI değeri (dashboard/trend grafiği için tek sayı)
+            try:
+                ndvi_stats = ndvi.reduceRegion(
+                    reducer=ee.Reducer.mean(),
+                    geometry=parcel_geometry,
+                    scale=10,
+                    maxPixels=1e9
+                ).getInfo()
+                mean_ndvi = ndvi_stats.get('NDVI')
+            except Exception as ndvi_stat_err:
+                print(f'⚠ NDVI ortalaması hesaplanamadı: {ndvi_stat_err}')
+                mean_ndvi = None
+
+            # Renklendirilmiş NDVI haritası: kırmızı (düşük/stresli) -> sarı -> yeşil (sağlıklı yoğun bitki)
+            ndvi_palette = [
+                '#d73027', '#f46d43', '#fdae61', '#fee08b',
+                '#ffffbf', '#d9ef8b', '#a6d96a', '#66bd63', '#1a9850'
+            ]
+            ndvi_url_ee = ndvi.getThumbURL({
+                'min': -0.2,
+                'max': 0.8,
+                'palette': ndvi_palette,
+                'dimensions': 1024,
+                'format': 'png'
+            })
+
+            # EE'nin süreli linklerini kalıcı hale getir: bytes'ı şimdi indirip
+            # diske kaydediyoruz, DB'ye kendi sabit URL'imizi yazıyoruz.
+            timestamp = int(time.time())
+            url = save_ee_thumbnail(url_ee, f"parcel_{parcel_id}_{timestamp}_rgb.png")
+            ndvi_url = save_ee_thumbnail(ndvi_url_ee, f"parcel_{parcel_id}_{timestamp}_ndvi.png")
+            cleanup_old_satellite_images(parcel_id)
             
             image_record = db.query(SatelliteImage)\
                 .filter(SatelliteImage.parcel_id == parcel_id)\
@@ -621,9 +750,11 @@ def fetch_satellite_bg(parcel_id: int, lat: float, lng: float):
             
             if image_record:
                 image_record.url = url
+                image_record.ndvi_url = ndvi_url
+                image_record.mean_ndvi = mean_ndvi
                 image_record.status = 'success'
                 db.commit()
-                print(f'✓ Satellite image ready for parcel {parcel_id}')
+                print(f'✓ Satellite image ready for parcel {parcel_id} (mean NDVI: {mean_ndvi})')
         else:
             image_record = db.query(SatelliteImage)\
                 .filter(SatelliteImage.parcel_id == parcel_id)\
@@ -673,6 +804,8 @@ async def get_satellite_image(parcel_id: int, db: Session = Depends(get_db)):
             "parcel_id": image.parcel_id,
             "status": image.status,
             "url": image.url,
+            "mean_ndvi": image.mean_ndvi,
+            "ndvi_url": image.ndvi_url,
             "error": image.error_message,
             "created_at": image.created_at.isoformat()
         }

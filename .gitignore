@@ -8,3 +8,4 @@ venv/
 backend/renta-key.json
 .env
 *.key
+backend/satellite_images/
