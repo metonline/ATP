@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useEffect, useRef } from 'react';
-import { useLocation } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { MapContainer, TileLayer, Marker, Popup, useMap, useMapEvents, Polygon } from 'react-leaflet';
 import L from 'leaflet';
 import * as turf from '@turf/turf';
@@ -69,10 +69,12 @@ function ZoomToParcel({
   lat,
   lng,
   enabled,
+  trigger,
 }: {
   lat: number | null;
   lng: number | null;
   enabled: boolean;
+  trigger?: number;
 }) {
   const map = useMap();
   useEffect(() => {
@@ -80,17 +82,47 @@ function ZoomToParcel({
       console.log('[ZOOM] Focusing on parcel:', lat, lng);
       map.flyTo([lat, lng], 17, { duration: 0.8 });
     }
-  }, [lat, lng, enabled, map]);
+  }, [lat, lng, enabled, map, trigger]);
+  return null;
+}
+
+// Leaflet, harita mount olduğu andaki container boyutuna göre projeksiyonunu
+// hesaplıyor. Grid/flex layout oturması, kenar panellerin (Parsel Düzenle vb.)
+// açılıp kapanmasıyla container boyutu SONRADAN değişirse, Leaflet bundan
+// haberdar olmuyor — harita "donuk" görünüyor, poligon dolgusu gerçek
+// container boyutuyla uyuşmuyor. ResizeObserver ile her boyut değişiminde
+// invalidateSize() çağırarak Leaflet'i güncel tutuyoruz.
+function MapAutoResize() {
+  const map = useMap();
+  useEffect(() => {
+    const container = map.getContainer();
+
+    const resizeObserver = new ResizeObserver(() => {
+      map.invalidateSize();
+    });
+    resizeObserver.observe(container);
+
+    // Mount anında da bir kez tetikle — ilk resize event'i bazı
+    // tarayıcılarda kaçabiliyor.
+    const initialTimer = setTimeout(() => map.invalidateSize(), 200);
+
+    return () => {
+      resizeObserver.disconnect();
+      clearTimeout(initialTimer);
+    };
+  }, [map]);
   return null;
 }
 
 export default function MapPage() {
   const { farmer, token } = useAuthStore();
   const location = useLocation();
+  const navigate = useNavigate();
   const [parcels, setParcels] = useState<Parcel[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [polygonPoints, setPolygonPoints] = useState<PolygonPoint[]>([]);
+  const [flyTrigger, setFlyTrigger] = useState(0);
   const [selectedLat, setSelectedLat] = useState<number | null>(null);
   const [selectedLng, setSelectedLng] = useState<number | null>(null);
   const [parcelName, setParcelName] = useState('');
@@ -333,7 +365,6 @@ export default function MapPage() {
       setShowForm(false);
       setPolygonPoints([]);
       setSuccess(`✓ ${result.display_name} bulundu!`);
-      setTimeout(() => setSuccess(''), 4000);
     } catch (err: any) {
       console.error('Adres arama hatası:', err);
       setError('Adres arama başarısız. Lütfen tekrar deneyin.');
@@ -413,7 +444,8 @@ export default function MapPage() {
     }
   };
 
-  const handleSaveEditedParcel = async () => {
+  const handleSaveEditedParcel = async (e: React.FormEvent) => {
+    e.preventDefault();
     console.log('[SAVE] handleSaveEditedParcel başladı');
     console.log('[SAVE] selectedParcel:', selectedParcel?.id);
     console.log('[SAVE] polygonPoints.length:', polygonPoints.length);
@@ -511,6 +543,26 @@ export default function MapPage() {
     setPolygonPoints([]);
     setParcelName('');
     setArea('');
+  };
+
+  const handleDeleteParcel = async () => {
+    if (!selectedParcel) return;
+
+    const confirmed = window.confirm(
+      `"${selectedParcel.parcel_name}" parselini silmek istediğine emin misin? Bu işlem geri alınamaz.`
+    );
+    if (!confirmed) return;
+
+    try {
+      await api.delete(`/api/parcels/${selectedParcel.id}`);
+      setParcels(parcels.filter((p) => p.id !== selectedParcel.id));
+      setSuccess('Parsel silindi.');
+      setShowForm(false);
+      handleCancelEdit();
+    } catch (err: any) {
+      console.error('Error deleting parcel:', err);
+      setError(err.response?.data?.detail || 'Parsel silinemedi.');
+    }
   };
 
   const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -733,22 +785,48 @@ export default function MapPage() {
         <div className="p-6">
           <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
             <div className="lg:col-span-1 space-y-4">
-              <div className="bg-white border border-gray-200 rounded-lg p-3">
-                <h3 className="font-semibold text-gray-900 mb-2">🔍 Parsel Bulma Yöntemi</h3>
-                <div className="grid grid-cols-3 gap-2">
+              <div className="bg-emerald-50 border border-emerald-200 rounded-lg p-3">
+                <h3 className="font-semibold text-emerald-900 mb-2">✏️ Parsel Alanı Belirle</h3>
+                {!(searchMode === 'draw' && drawingMode) ? (
                   <button
                     onClick={() => {
                       setSearchMode('draw');
-                      setDrawingMode(false);
+                      setDrawingMode(true);
                     }}
-                    className={`px-2 py-2 rounded text-xs font-medium transition ${
-                      searchMode === 'draw'
-                        ? 'bg-blue-600 text-white'
-                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                    }`}
+                    className="w-full bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-2 rounded text-sm font-medium"
                   >
-                    🖍️ Harita Çiz
+                    🖍️ Haritada Çizerek Belirle
                   </button>
+                ) : (
+                  <div className="space-y-2">
+                    <p className="text-sm text-emerald-800">
+                      Haritaya tıklayarak parsel sınırını belirle (min. 3 nokta)
+                    </p>
+                    <p className="text-xs text-emerald-700">
+                      Nokta sayısı: {polygonPoints.length}
+                    </p>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={handleFinishPolygon}
+                        disabled={polygonPoints.length < 3}
+                        className="flex-1 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white px-3 py-2 rounded text-sm font-medium"
+                      >
+                        Tamamla ({polygonPoints.length}/3+)
+                      </button>
+                      <button
+                        onClick={handleClearPolygon}
+                        className="flex-1 bg-gray-400 hover:bg-gray-500 text-white px-3 py-2 rounded text-sm font-medium"
+                      >
+                        Temizle
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              <div className="bg-white border border-gray-200 rounded-lg p-3">
+                <h3 className="font-semibold text-gray-900 mb-2">🔍 Parsel Bulma Yöntemi</h3>
+                <div className="grid grid-cols-2 gap-2">
                   <button
                     onClick={() => {
                       setSearchMode('ada-parsel');
@@ -803,44 +881,6 @@ export default function MapPage() {
                   </button>
                 </div>
               </div>
-
-              {searchMode === 'draw' && (
-                <div className="bg-green-50 border border-green-200 rounded-lg p-4">
-                  <h3 className="font-semibold text-green-900 mb-2">🖍️ Polygon Çizim Modu</h3>
-                  {!drawingMode ? (
-                    <button
-                      onClick={() => setDrawingMode(true)}
-                      className="w-full bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded font-medium text-sm"
-                    >
-                      Çizime Başla
-                    </button>
-                  ) : (
-                    <div className="space-y-2">
-                      <p className="text-sm text-green-800">
-                        Haritaya tıklayarak parsel sınırını belirle (min. 3 nokta)
-                      </p>
-                      <p className="text-xs text-green-700">
-                        Nokta sayısı: {polygonPoints.length}
-                      </p>
-                      <div className="flex gap-2">
-                        <button
-                          onClick={handleFinishPolygon}
-                          disabled={polygonPoints.length < 3}
-                          className="flex-1 bg-green-600 hover:bg-green-700 disabled:opacity-50 text-white px-3 py-2 rounded text-sm font-medium"
-                        >
-                          Tamamla ({polygonPoints.length}/3+)
-                        </button>
-                        <button
-                          onClick={handleClearPolygon}
-                          className="flex-1 bg-gray-400 hover:bg-gray-500 text-white px-3 py-2 rounded text-sm font-medium"
-                        >
-                          Temizle
-                        </button>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              )}
 
               {searchMode === 'ada-parsel' && (
                 <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
@@ -972,7 +1012,14 @@ export default function MapPage() {
                 </div>
               )}
               {success && (
-                <div className="bg-green-50 border border-green-200 rounded-lg p-3 text-green-700 text-sm">
+                <div
+                  onClick={() => {
+                    if (selectedLat && selectedLng) setFlyTrigger((t) => t + 1);
+                  }}
+                  className={`bg-green-50 border border-green-200 rounded-lg p-3 text-green-700 text-sm ${
+                    selectedLat && selectedLng ? 'cursor-pointer hover:bg-green-100' : ''
+                  }`}
+                >
                   {success}
                 </div>
               )}
@@ -1025,6 +1072,25 @@ export default function MapPage() {
                         İptal
                       </button>
                     </div>
+
+                    {isEditingParcel && selectedParcel && (
+                      <>
+                        <button
+                          type="button"
+                          onClick={() => navigate(`/parcels/${selectedParcel.id}/satellite`)}
+                          className="w-full bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-2 rounded text-sm font-medium"
+                        >
+                          🛰️ Uydu Görüntüleri ve İndeksler
+                        </button>
+                        <button
+                          type="button"
+                          onClick={handleDeleteParcel}
+                          className="w-full bg-red-600 hover:bg-red-700 text-white px-3 py-2 rounded text-sm font-medium"
+                        >
+                          🗑️ Parseli Sil
+                        </button>
+                      </>
+                    )}
                   </form>
                 </div>
               )}
@@ -1047,10 +1113,22 @@ export default function MapPage() {
                       <li
                         key={parcel.id}
                         onClick={() => handleOpenParcelDetail(parcel)}
-                        className="p-3 bg-gray-50 border border-gray-200 rounded text-sm hover:bg-blue-50 cursor-pointer transition"
+                        className="p-3 bg-gray-50 border border-gray-200 rounded text-sm hover:bg-blue-50 cursor-pointer transition flex items-center justify-between gap-2"
                       >
-                        <p className="font-medium text-gray-900">📍 {parcel.parcel_name}</p>
-                        <p className="text-xs text-gray-600 mt-1">{parcel.area_hectares} hektar</p>
+                        <div>
+                          <p className="font-medium text-gray-900">📍 {parcel.parcel_name}</p>
+                          <p className="text-xs text-gray-600 mt-1">{parcel.area_hectares} hektar</p>
+                        </div>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            navigate(`/parcels/${parcel.id}/satellite`);
+                          }}
+                          title="Uydu görüntüsünü görüntüle"
+                          className="shrink-0 p-2 rounded hover:bg-blue-100 text-blue-600"
+                        >
+                          🛰️
+                        </button>
                       </li>
                     ))}
                   </ul>
@@ -1059,7 +1137,7 @@ export default function MapPage() {
             </div>
 
             <div className="lg:col-span-3">
-              <div className="bg-white border border-gray-200 rounded-lg shadow-sm overflow-hidden h-96 lg:h-full min-h-96">
+              <div className="bg-white border border-gray-200 rounded-lg shadow-sm overflow-hidden h-[600px] lg:h-[750px]">
                 <MapContainer
                   center={[centerLat, centerLng]}
                   zoom={6}
@@ -1200,7 +1278,8 @@ export default function MapPage() {
                   )}
 
                   <MapClickHandler onMapClick={handleMapClick} />
-                  <ZoomToParcel lat={selectedLat} lng={selectedLng} enabled={isEditingParcel} />
+                  <ZoomToParcel lat={selectedLat} lng={selectedLng} enabled={true} trigger={flyTrigger} />
+                  <MapAutoResize />
                 </MapContainer>
               </div>
             </div>
@@ -1238,12 +1317,24 @@ export default function MapPage() {
                 </div>
               </div>
 
-              <div className="flex gap-2">
+              <div className="flex flex-wrap gap-2">
+                <button
+                  onClick={() => navigate(`/parcels/${selectedParcel.id}/satellite`)}
+                  className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded font-medium"
+                >
+                  🛰️ Uydu Görüntüsü
+                </button>
                 <button
                   onClick={() => setIsEditingParcel(true)}
                   className="flex-1 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded font-medium"
                 >
                   ✏️ Düzenle
+                </button>
+                <button
+                  onClick={handleDeleteParcel}
+                  className="flex-1 bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded font-medium"
+                >
+                  🗑️ Sil
                 </button>
                 <button
                   onClick={handleCancelEdit}

@@ -1,4 +1,4 @@
-const CACHE_NAME = 'ia-platform-v1';
+const CACHE_NAME = 'ia-platform-v2';
 const URLS_TO_CACHE = [
   '/',
   '/index.html',
@@ -33,6 +33,14 @@ self.addEventListener('activate', (event) => {
 
 self.addEventListener('fetch', (event) => {
   if (event.request.method !== 'GET') {
+    return;
+  }
+
+  // API istekleri (backend'e giden her şey) asla cache'lenmesin — her zaman
+  // ağdan taze veri gelsin. Bunları service worker'ın önbellek mantığının
+  // tamamen dışında bırakıyoruz; tarayıcının normal fetch davranışına bırakılır.
+  const url = new URL(event.request.url);
+  if (url.pathname.startsWith('/api/')) {
     return;
   }
 

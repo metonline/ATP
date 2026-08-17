@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { api } from '../store/auth';
 import { useAuthStore } from '../store/auth';
 
@@ -14,6 +14,7 @@ interface Parcel {
 
 export default function DashboardPage() {
   const { farmer } = useAuthStore();
+  const navigate = useNavigate();
   const [parcels, setParcels] = useState<Parcel[]>([]);
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState({ total_area: 0, parcel_count: 0 });
@@ -167,7 +168,11 @@ export default function DashboardPage() {
                   </thead>
                   <tbody>
                     {parcels.slice(0, 5).map((parcel) => (
-                      <tr key={parcel.id} className="border-b hover:bg-gray-50">
+                      <tr
+                        key={parcel.id}
+                        onClick={() => navigate('/map', { state: { editingParcelId: parcel.id } })}
+                        className="border-b hover:bg-gray-50 cursor-pointer"
+                      >
                         <td className="py-3 px-4 text-gray-900 font-medium">{parcel.parcel_name}</td>
                         <td className="py-3 px-4 text-gray-600">{parcel.area_hectares}</td>
                         <td className="py-3 px-4 text-gray-600 text-sm">
@@ -176,6 +181,7 @@ export default function DashboardPage() {
                         <td className="py-3 px-4">
                           <Link
                             to={`/parcels/${parcel.id}/satellite`}
+                            onClick={(e) => e.stopPropagation()}
                             className="text-blue-600 hover:text-blue-800 font-medium text-sm"
                           >
                             Uydu →

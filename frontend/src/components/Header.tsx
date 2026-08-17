@@ -59,6 +59,13 @@ export default function Header() {
                 <p className="font-medium text-gray-900">{farmer?.full_name}</p>
                 <p className="text-xs">{farmer?.email}</p>
               </div>
+              <Link
+                to="/profile"
+                onClick={() => setMenuOpen(false)}
+                className="block w-full text-left px-4 py-2 text-gray-700 hover:bg-gray-50 transition font-medium text-sm"
+              >
+                👤 Profilim
+              </Link>
               <button
                 onClick={handleLogout}
                 className="w-full text-left px-4 py-2 text-red-600 hover:bg-red-50 transition font-medium text-sm"

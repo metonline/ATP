@@ -9,13 +9,18 @@ import DashboardPage from './pages/DashboardPage';
 import MapPage from './pages/MapPage';
 import ParcelPage from './pages/ParcelPage';
 import SatellitePage from './pages/SatellitePage';
+import ProfilePage from './pages/ProfilePage';
 
 // Components
 import Header from './components/Header';
 import ProtectedRoute from './components/ProtectedRoute';
 
 // PWA Service Worker registration
-if ('serviceWorker' in navigator) {
+// Service worker sadece production build'de aktif — dev modda (npm run dev)
+// Vite dosyaları hash'siz/sabit URL'lerle servis ettiği için service worker
+// eski kodu cache'leyip yanıltıcı davranabiliyor. import.meta.env.PROD sadece
+// gerçek `npm run build` çıktısında true olur.
+if ('serviceWorker' in navigator && import.meta.env.PROD) {
   navigator.serviceWorker.register('/sw.js');
 }
 
@@ -70,6 +75,15 @@ export default function App() {
               element={
                 <ProtectedRoute>
                   <SatellitePage />
+                </ProtectedRoute>
+              }
+            />
+
+            <Route
+              path="/profile"
+              element={
+                <ProtectedRoute>
+                  <ProfilePage />
                 </ProtectedRoute>
               }
             />

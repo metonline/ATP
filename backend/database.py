@@ -96,6 +96,17 @@ class SatelliteImage(Base):
     # NDVI (bitki sağlığı indeksi) alanları
     mean_ndvi = Column(Float, nullable=True)  # Parselin ortalama NDVI değeri (-1..1)
     ndvi_url = Column(String, nullable=True)  # Renklendirilmiş NDVI haritasının EE thumbnail URL'i
+    # Ek spektral indeksler (hepsi aynı Sentinel-2 görüntüsünden, ek maliyetsiz)
+    mean_ndre = Column(Float, nullable=True)
+    ndre_url = Column(String, nullable=True)
+    mean_ndmi = Column(Float, nullable=True)
+    ndmi_url = Column(String, nullable=True)
+    mean_evi = Column(Float, nullable=True)
+    evi_url = Column(String, nullable=True)
+    mean_savi = Column(Float, nullable=True)
+    savi_url = Column(String, nullable=True)
+    mean_gndvi = Column(Float, nullable=True)
+    gndvi_url = Column(String, nullable=True)
 
 def get_db():
     db = SessionLocal()

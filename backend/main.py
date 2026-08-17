@@ -4,11 +4,10 @@ FastAPI server for farmer authentication, parcel management, satellite imagery
 """
 
 import ee
-from fastapi import FastAPI, BackgroundTasks, Depends, HTTPException, status, UploadFile, Header
+from fastapi import FastAPI, BackgroundTasks, Depends, HTTPException, status, UploadFile, Header, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import Response
-import google.auth
 from google.auth.transport.requests import AuthorizedSession
 from sqlalchemy.orm import Session
 from pydantic import BaseModel, EmailStr
@@ -41,6 +40,23 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+# Tüm /api/ cevaplarının tarayıcı tarafından cache'lenmesini engeller.
+# FastAPI varsayılan olarak Cache-Control header'ı göndermiyor; header
+# yoksa tarayıcı bazı durumlarda GET isteklerini heuristik olarak
+# cache'leyebiliyor (örn. bir parsel silindikten sonra listede hâlâ
+# görünmesi gibi bayat veri sorunlarına yol açar). Bu middleware her
+# /api/ isteğine "asla cache'leme" talimatını ekleyerek veriyi her
+# zaman gerçek zamanlı (backend'den taze) tutar.
+@app.middleware("http")
+async def add_no_cache_headers(request: Request, call_next):
+    response = await call_next(request)
+    if request.url.path.startswith("/api/"):
+        response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+        response.headers["Pragma"] = "no-cache"
+    return response
+
 
 # Initialize database on startup
 @app.on_event("startup")
@@ -87,6 +103,18 @@ class FarmerProfile(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+class ProfileUpdate(BaseModel):
+    phone: Optional[str] = None
+    farm_size_hectares: Optional[float] = None
+    primary_crops: Optional[str] = None
+    region: Optional[str] = None
+
+
+class PasswordChange(BaseModel):
+    old_password: str
+    new_password: str
 
 
 class ParcelCreate(BaseModel):
@@ -268,9 +296,7 @@ async def get_profile(
 
 @app.put("/api/auth/profile")
 async def update_profile(
-    farm_size_hectares: Optional[float] = None,
-    primary_crops: Optional[str] = None,
-    phone: Optional[str] = None,
+    profile: ProfileUpdate,
     authorization: Optional[str] = Header(None),
     db: Session = Depends(get_db)
 ):
@@ -278,12 +304,14 @@ async def update_profile(
     token = extract_token_from_header(authorization)
     farmer = get_current_farmer(token, db)
 
-    if farm_size_hectares is not None:
-        farmer.farm_size_hectares = farm_size_hectares
-    if primary_crops is not None:
-        farmer.primary_crops = primary_crops
-    if phone is not None:
-        farmer.phone = phone
+    if profile.farm_size_hectares is not None:
+        farmer.farm_size_hectares = profile.farm_size_hectares
+    if profile.primary_crops is not None:
+        farmer.primary_crops = profile.primary_crops
+    if profile.phone is not None:
+        farmer.phone = profile.phone
+    if profile.region is not None:
+        farmer.region = profile.region
 
     db.commit()
     return {"status": "updated"}
@@ -586,13 +614,13 @@ async def fetch_satellite_image(parcel_id: int, background_tasks: BackgroundTask
 
 def get_ee_session() -> AuthorizedSession:
     """
-    EE thumbnail URL'leri (getThumbURL) authenticated bir istek gerektiriyor.
-    ee.Initialize()'ın kullandığı aynı Application Default Credentials
-    (renta-key.json service account) ile authorized bir requests session döner.
+    EE thumbnail URL'leri authenticated bir istek gerektiriyor.
+    google.auth.default() (ayrı bir ADC/service-account kurulumu gerektirir)
+    yerine, ee.Initialize()'ın zaten başarıyla kullandığı kimlik bilgilerini
+    doğrudan EE'den alıyoruz. ee.Initialize() çalışıyorsa bu da çalışır,
+    ekstra bir ortam değişkeni ayarlamaya gerek kalmaz.
     """
-    credentials, _ = google.auth.default(
-        scopes=['https://www.googleapis.com/auth/cloud-platform']
-    )
+    credentials = ee.data.get_persistent_credentials()
     return AuthorizedSession(credentials)
 
 
@@ -625,7 +653,7 @@ def cleanup_old_satellite_images(parcel_id: int, keep: int = 3):
     (mgbric.info'daki 816 dosya / ~103GB disk krizi burada tekrarlanmasın diye).
     Her fetch sonrası çağrılır, sadece en yeni `keep` kadar dosyayı tutar.
     """
-    for suffix in ("rgb", "ndvi"):
+    for suffix in ("rgb", "ndvi", "ndre", "ndmi", "evi", "savi", "gndvi"):
         pattern = f"parcel_{parcel_id}_*_{suffix}.png"
         files = sorted(
             SATELLITE_IMAGE_DIR.glob(pattern),
@@ -701,37 +729,6 @@ def fetch_satellite_bg(parcel_id: int, lat: float, lng: float):
                 'min': band_min,
                 'max': band_max,
                 'gamma': 1.4,
-                'dimensions': 1024,  # 512'den yükseltildi: UI'da daha büyük/pürüzsüz görünüm
-                'format': 'png'
-            })
-
-            # --- NDVI (bitki sağlığı indeksi) ---
-            # NDVI = (NIR - Red) / (NIR + Red) = (B8 - B4) / (B8 + B4)
-            # normalizedDifference(['B8','B4']) tam olarak bunu hesaplıyor.
-            ndvi = clipped.normalizedDifference(['B8', 'B4']).rename('NDVI')
-
-            # Parselin ortalama NDVI değeri (dashboard/trend grafiği için tek sayı)
-            try:
-                ndvi_stats = ndvi.reduceRegion(
-                    reducer=ee.Reducer.mean(),
-                    geometry=parcel_geometry,
-                    scale=10,
-                    maxPixels=1e9
-                ).getInfo()
-                mean_ndvi = ndvi_stats.get('NDVI')
-            except Exception as ndvi_stat_err:
-                print(f'⚠ NDVI ortalaması hesaplanamadı: {ndvi_stat_err}')
-                mean_ndvi = None
-
-            # Renklendirilmiş NDVI haritası: kırmızı (düşük/stresli) -> sarı -> yeşil (sağlıklı yoğun bitki)
-            ndvi_palette = [
-                '#d73027', '#f46d43', '#fdae61', '#fee08b',
-                '#ffffbf', '#d9ef8b', '#a6d96a', '#66bd63', '#1a9850'
-            ]
-            ndvi_url_ee = ndvi.getThumbURL({
-                'min': -0.2,
-                'max': 0.8,
-                'palette': ndvi_palette,
                 'dimensions': 1024,
                 'format': 'png'
             })
@@ -740,7 +737,95 @@ def fetch_satellite_bg(parcel_id: int, lat: float, lng: float):
             # diske kaydediyoruz, DB'ye kendi sabit URL'imizi yazıyoruz.
             timestamp = int(time.time())
             url = save_ee_thumbnail(url_ee, f"parcel_{parcel_id}_{timestamp}_rgb.png")
-            ndvi_url = save_ee_thumbnail(ndvi_url_ee, f"parcel_{parcel_id}_{timestamp}_ndvi.png")
+
+            # --- Spektral indeksler (NDVI, NDRE, NDMI, EVI, SAVI, GNDVI) ---
+            # Hepsi aynı Sentinel-2 görüntüsünden (B2-B11 bantları) hesaplanıyor,
+            # ek bir veri kaynağı ya da maliyet gerektirmiyor. Reflectance'ı
+            # 0-1 aralığına çeviriyoruz; EVI/SAVI'nin sabit terimleri (7.5*Blue,
+            # +1, +0.5 gibi) bu ölçeği bekliyor. NDVI/NDRE/NDMI/GNDVI oran
+            # tabanlı olduğu için ölçekten etkilenmiyor, sonuç aynı çıkıyor.
+            scaled = clipped.divide(10000)
+
+            veg_palette = [
+                '#d73027', '#f46d43', '#fdae61', '#fee08b',
+                '#ffffbf', '#d9ef8b', '#a6d96a', '#66bd63', '#1a9850'
+            ]
+            moisture_palette = [
+                '#8c510a', '#bf812d', '#dfc27d', '#f6e8c3',
+                '#c7eae5', '#80cdc1', '#35978f', '#01665e'
+            ]
+
+            index_definitions = {
+                'ndvi': {
+                    'label': 'NDVI',
+                    'image': scaled.normalizedDifference(['B8', 'B4']),
+                    'min': -0.2, 'max': 0.8, 'palette': veg_palette,
+                },
+                'ndre': {
+                    'label': 'NDRE',
+                    'image': scaled.normalizedDifference(['B8', 'B5']),
+                    'min': -0.1, 'max': 0.5, 'palette': veg_palette,
+                },
+                'ndmi': {
+                    'label': 'NDMI',
+                    'image': scaled.normalizedDifference(['B8', 'B11']),
+                    'min': -0.4, 'max': 0.4, 'palette': moisture_palette,
+                },
+                'evi': {
+                    'label': 'EVI',
+                    'image': scaled.expression(
+                        '2.5 * ((NIR - RED) / (NIR + 6 * RED - 7.5 * BLUE + 1))',
+                        {'NIR': scaled.select('B8'), 'RED': scaled.select('B4'), 'BLUE': scaled.select('B2')}
+                    ),
+                    'min': -0.2, 'max': 0.8, 'palette': veg_palette,
+                },
+                'savi': {
+                    'label': 'SAVI',
+                    'image': scaled.expression(
+                        '((NIR - RED) / (NIR + RED + 0.5)) * 1.5',
+                        {'NIR': scaled.select('B8'), 'RED': scaled.select('B4')}
+                    ),
+                    'min': -0.2, 'max': 0.8, 'palette': veg_palette,
+                },
+                'gndvi': {
+                    'label': 'GNDVI',
+                    'image': scaled.normalizedDifference(['B8', 'B3']),
+                    'min': -0.2, 'max': 0.8, 'palette': veg_palette,
+                },
+            }
+
+            index_results = {}
+            for key, cfg in index_definitions.items():
+                band_image = cfg['image'].rename(key.upper())
+
+                try:
+                    stat = band_image.reduceRegion(
+                        reducer=ee.Reducer.mean(),
+                        geometry=parcel_geometry,
+                        scale=10,
+                        maxPixels=1e9
+                    ).getInfo()
+                    mean_value = stat.get(key.upper())
+                except Exception as stat_err:
+                    print(f'⚠ {cfg["label"]} ortalaması hesaplanamadı: {stat_err}')
+                    mean_value = None
+
+                try:
+                    thumb_ee_url = band_image.getThumbURL({
+                        'min': cfg['min'],
+                        'max': cfg['max'],
+                        'palette': cfg['palette'],
+                        'dimensions': 1024,
+                        'format': 'png'
+                    })
+                    thumb_url = save_ee_thumbnail(thumb_ee_url, f"parcel_{parcel_id}_{timestamp}_{key}.png")
+                except Exception as thumb_err:
+                    print(f'⚠ {cfg["label"]} haritası oluşturulamadı: {thumb_err}')
+                    thumb_url = None
+
+                index_results[key] = {'mean': mean_value, 'url': thumb_url}
+                print(f'  {cfg["label"]}: mean={mean_value}')
+
             cleanup_old_satellite_images(parcel_id)
             
             image_record = db.query(SatelliteImage)\
@@ -750,11 +835,21 @@ def fetch_satellite_bg(parcel_id: int, lat: float, lng: float):
             
             if image_record:
                 image_record.url = url
-                image_record.ndvi_url = ndvi_url
-                image_record.mean_ndvi = mean_ndvi
+                image_record.ndvi_url = index_results['ndvi']['url']
+                image_record.mean_ndvi = index_results['ndvi']['mean']
+                image_record.ndre_url = index_results['ndre']['url']
+                image_record.mean_ndre = index_results['ndre']['mean']
+                image_record.ndmi_url = index_results['ndmi']['url']
+                image_record.mean_ndmi = index_results['ndmi']['mean']
+                image_record.evi_url = index_results['evi']['url']
+                image_record.mean_evi = index_results['evi']['mean']
+                image_record.savi_url = index_results['savi']['url']
+                image_record.mean_savi = index_results['savi']['mean']
+                image_record.gndvi_url = index_results['gndvi']['url']
+                image_record.mean_gndvi = index_results['gndvi']['mean']
                 image_record.status = 'success'
                 db.commit()
-                print(f'✓ Satellite image ready for parcel {parcel_id} (mean NDVI: {mean_ndvi})')
+                print(f'✓ Satellite image ready for parcel {parcel_id} (mean NDVI: {index_results["ndvi"]["mean"]})')
         else:
             image_record = db.query(SatelliteImage)\
                 .filter(SatelliteImage.parcel_id == parcel_id)\
@@ -806,6 +901,16 @@ async def get_satellite_image(parcel_id: int, db: Session = Depends(get_db)):
             "url": image.url,
             "mean_ndvi": image.mean_ndvi,
             "ndvi_url": image.ndvi_url,
+            "mean_ndre": image.mean_ndre,
+            "ndre_url": image.ndre_url,
+            "mean_ndmi": image.mean_ndmi,
+            "ndmi_url": image.ndmi_url,
+            "mean_evi": image.mean_evi,
+            "evi_url": image.evi_url,
+            "mean_savi": image.mean_savi,
+            "savi_url": image.savi_url,
+            "mean_gndvi": image.mean_gndvi,
+            "gndvi_url": image.gndvi_url,
             "error": image.error_message,
             "created_at": image.created_at.isoformat()
         }
@@ -817,34 +922,19 @@ async def get_satellite_image(parcel_id: int, db: Session = Depends(get_db)):
 
 
 
-
-
-@app.get("/api/auth/profile")
-async def get_profile(
-    authorization: Optional[str] = Header(None),
-    db: Session = Depends(get_db)
-):
-    token = extract_token_from_header(authorization)
-    farmer = get_current_farmer(token, db)
-    return {
-        "id": farmer.id,
-        "username": farmer.username,
-        "full_name": farmer.full_name,
-        "phone": farmer.phone
-    }
-
 @app.post("/api/auth/change-password")
 async def change_password(
-    old_password: str,
-    new_password: str,
+    passwords: PasswordChange,
     authorization: Optional[str] = Header(None),
     db: Session = Depends(get_db)
 ):
     token = extract_token_from_header(authorization)
     farmer = get_current_farmer(token, db)
-    if not verify_password(old_password, farmer.password_hash):
+    if not verify_password(passwords.old_password, farmer.password_hash):
         raise HTTPException(status_code=400, detail="Eski şifre yanlış")
-    farmer.password_hash = get_password_hash(new_password)
+    if len(passwords.new_password) < 6:
+        raise HTTPException(status_code=400, detail="Yeni şifre en az 6 karakter olmalı")
+    farmer.password_hash = get_password_hash(passwords.new_password)
     db.commit()
     return {"message": "Şifre başarıyla değiştirildi"}
 

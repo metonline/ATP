@@ -1,245 +1,310 @@
-﻿import React, { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import React, { useState, useEffect } from "react";
 import { api } from "../store/auth";
-import { useAuthStore } from "../store/auth";
 
-interface ProfileData {
+interface Profile {
   id: number;
+  email: string;
   username: string;
   full_name: string;
-  phone?: string;
+  region: string | null;
+  phone: string | null;
+  farm_size_hectares: number | null;
+  primary_crops: string | null;
+  created_at: string;
 }
 
 export default function ProfilePage() {
-  const navigate = useNavigate();
-  const { farmer } = useAuthStore();
-  
-  const [profileData, setProfileData] = useState<ProfileData | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [editMode, setEditMode] = useState(false);
-  const [passwordMode, setPasswordMode] = useState(false);
-  
-  const [fullName, setFullName] = useState("");
+  const [profile, setProfile] = useState<Profile | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [saveSuccess, setSaveSuccess] = useState(false);
+
+  // Düzenlenebilir alanlar için ayrı form state'i
+  const [region, setRegion] = useState("");
   const [phone, setPhone] = useState("");
+  const [farmSizeHectares, setFarmSizeHectares] = useState("");
+  const [primaryCrops, setPrimaryCrops] = useState("");
+
+  // Şifre değiştirme formu
   const [oldPassword, setOldPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
-  
-  const [error, setError] = useState("");
-  const [success, setSuccess] = useState("");
-  const [updating, setUpdating] = useState(false);
+  const [passwordSaving, setPasswordSaving] = useState(false);
+  const [passwordError, setPasswordError] = useState<string | null>(null);
+  const [passwordSuccess, setPasswordSuccess] = useState(false);
 
   useEffect(() => {
-    if (!farmer) {
-      navigate("/login");
-      return;
-    }
-    loadProfile();
-  }, [farmer, navigate]);
+    fetchProfile();
+  }, []);
 
-  const loadProfile = async () => {
+  const fetchProfile = async () => {
     try {
       setLoading(true);
+      setError(null);
       const response = await api.get("/api/auth/profile");
-      setProfileData(response.data);
-      setFullName(response.data.full_name);
-      setPhone(response.data.phone || "");
+      const data: Profile = response.data;
+      setProfile(data);
+      setRegion(data.region || "");
+      setPhone(data.phone || "");
+      setFarmSizeHectares(data.farm_size_hectares !== null ? String(data.farm_size_hectares) : "");
+      setPrimaryCrops(data.primary_crops || "");
     } catch (err) {
-      console.error("Error loading profile:", err);
-      setError("Profil yüklenemedi");
+      console.error("Error fetching profile:", err);
+      setError("Profil bilgileri yüklenemedi.");
     } finally {
       setLoading(false);
     }
   };
 
-  const handleUpdateProfile = async () => {
-    try {
-      setError("");
-      setUpdating(true);
-      
-      const response = await api.put("/api/auth/profile", {
-        full_name: fullName,
-        phone: phone || null
-      });
-      
-      setProfileData(response.data);
-      setSuccess("✓ Profil güncellendi");
-      setEditMode(false);
-      setTimeout(() => setSuccess(""), 3000);
-    } catch (err: any) {
-      setError(err.response?.data?.detail || "Güncelleme başarısız");
-    } finally {
-      setUpdating(false);
-    }
-  };
+  const handlePasswordChange = async () => {
+    setPasswordError(null);
+    setPasswordSuccess(false);
 
-  const handleChangePassword = async () => {
-    setError("");
-    
-    if (newPassword !== confirmPassword) {
-      setError("Yeni şifreler eşleşmiyor");
+    if (!oldPassword || !newPassword || !confirmPassword) {
+      setPasswordError("Tüm şifre alanlarını doldur.");
       return;
     }
-    
     if (newPassword.length < 6) {
-      setError("Şifre en az 6 karakter olmalı");
+      setPasswordError("Yeni şifre en az 6 karakter olmalı.");
       return;
     }
-    
+    if (newPassword !== confirmPassword) {
+      setPasswordError("Yeni şifreler eşleşmiyor.");
+      return;
+    }
+
     try {
-      setUpdating(true);
+      setPasswordSaving(true);
       await api.post("/api/auth/change-password", {
         old_password: oldPassword,
-        new_password: newPassword
+        new_password: newPassword,
       });
-      
-      setSuccess("✓ Şifre başarıyla değiştirildi");
+      setPasswordSuccess(true);
       setOldPassword("");
       setNewPassword("");
       setConfirmPassword("");
-      setPasswordMode(false);
-      setTimeout(() => setSuccess(""), 3000);
+      setTimeout(() => setPasswordSuccess(false), 3000);
     } catch (err: any) {
-      setError(err.response?.data?.detail || "Şifre değiştirilemedi");
+      console.error("Error changing password:", err);
+      setPasswordError(err.response?.data?.detail || "Şifre değiştirilemedi.");
     } finally {
-      setUpdating(false);
+      setPasswordSaving(false);
     }
   };
 
-  if (loading) {
-    return <div className="min-h-screen bg-gray-50 flex items-center justify-center">Yükleniyor...</div>;
-  }
+  const handleSave = async () => {
+    try {
+      setSaving(true);
+      setError(null);
+      setSaveSuccess(false);
+
+      await api.put("/api/auth/profile", {
+        region: region || null,
+        phone: phone || null,
+        farm_size_hectares: farmSizeHectares ? parseFloat(farmSizeHectares) : null,
+        primary_crops: primaryCrops || null,
+      });
+
+      setSaveSuccess(true);
+      await fetchProfile();
+      setTimeout(() => setSaveSuccess(false), 3000);
+    } catch (err) {
+      console.error("Error saving profile:", err);
+      setError("Profil güncellenemedi. Lütfen tekrar deneyin.");
+    } finally {
+      setSaving(false);
+    }
+  };
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <div className="max-w-2xl mx-auto">
+      <div className="max-w-4xl mx-auto">
         <div className="bg-white shadow-sm border-b">
           <div className="px-6 py-4">
-            <h1 className="text-2xl font-bold text-gray-900">👤 Profil</h1>
-            <p className="text-gray-600 mt-1">Hesap bilgilerini yönet</p>
+            <h1 className="text-2xl font-bold text-gray-900">👤 Profilim</h1>
+            <p className="text-gray-600 mt-1">Hesap bilgilerin ve çiftlik detayların</p>
           </div>
         </div>
 
         <div className="p-6 space-y-6">
-          {error && <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-red-700">{error}</div>}
-          {success && <div className="bg-green-50 border border-green-200 rounded-lg p-4 text-green-700">{success}</div>}
-
-          {/* Profil Bilgileri */}
-          <div className="bg-white border rounded-lg p-6">
-            <div className="flex justify-between items-center mb-4">
-              <h2 className="text-lg font-semibold text-gray-900">Profil Bilgileri</h2>
+          {loading ? (
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+              <p className="text-blue-700">Yükleniyor...</p>
+            </div>
+          ) : error && !profile ? (
+            <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+              <p className="text-red-700 font-medium">❌ Hata</p>
+              <p className="text-red-600 text-sm mt-2">{error}</p>
               <button
-                onClick={() => setEditMode(!editMode)}
-                className="text-blue-600 hover:text-blue-700 text-sm font-medium"
+                onClick={fetchProfile}
+                className="mt-4 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded"
               >
-                {editMode ? "İptal" : "Düzenle"}
+                Tekrar Dene
               </button>
             </div>
-
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Email (Değiştirilemiyor)</label>
-                <input
-                  type="email"
-                  value={profileData?.username || ""}
-                  disabled
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg bg-gray-50 text-gray-600"
-                />
+          ) : profile ? (
+            <>
+              {/* Değiştirilemeyen hesap bilgileri */}
+              <div className="bg-white rounded-lg shadow border border-gray-200 p-6">
+                <h2 className="text-lg font-semibold text-gray-900 mb-4">Hesap Bilgileri</h2>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
+                  <div>
+                    <p className="text-gray-500">E-posta</p>
+                    <p className="text-gray-900 font-medium">{profile.email}</p>
+                  </div>
+                  <div>
+                    <p className="text-gray-500">Kullanıcı Adı</p>
+                    <p className="text-gray-900 font-medium">{profile.username}</p>
+                  </div>
+                  <div>
+                    <p className="text-gray-500">Ad Soyad</p>
+                    <p className="text-gray-900 font-medium">{profile.full_name}</p>
+                  </div>
+                  <div>
+                    <p className="text-gray-500">Üyelik Tarihi</p>
+                    <p className="text-gray-900 font-medium">
+                      {new Date(profile.created_at).toLocaleDateString("tr-TR")}
+                    </p>
+                  </div>
+                </div>
               </div>
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Ad Soyad</label>
-                <input
-                  type="text"
-                  value={fullName}
-                  onChange={(e) => setFullName(e.target.value)}
-                  disabled={!editMode}
-                  className={`w-full px-4 py-2 border rounded-lg ${
-                    editMode ? "border-gray-300" : "border-gray-300 bg-gray-50 text-gray-600"
-                  }`}
-                />
-              </div>
+              {/* Düzenlenebilir çiftlik bilgileri */}
+              <div className="bg-white rounded-lg shadow border border-gray-200 p-6">
+                <h2 className="text-lg font-semibold text-gray-900 mb-4">Çiftlik Bilgileri</h2>
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Telefon (İsteğe bağlı)</label>
-                <input
-                  type="tel"
-                  value={phone}
-                  onChange={(e) => setPhone(e.target.value)}
-                  disabled={!editMode}
-                  placeholder="+90 5XX XXX XXXX"
-                  className={`w-full px-4 py-2 border rounded-lg ${
-                    editMode ? "border-gray-300" : "border-gray-300 bg-gray-50 text-gray-600"
-                  }`}
-                />
-              </div>
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Bölge</label>
+                    <input
+                      type="text"
+                      value={region}
+                      onChange={(e) => setRegion(e.target.value)}
+                      placeholder="örn. Hatay, Reyhanlı"
+                      className="w-full border border-gray-300 rounded-lg px-3 py-2 text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
 
-              {editMode && (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Telefon</label>
+                    <input
+                      type="tel"
+                      value={phone}
+                      onChange={(e) => setPhone(e.target.value)}
+                      placeholder="örn. 0532 123 45 67"
+                      className="w-full border border-gray-300 rounded-lg px-3 py-2 text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Toplam Çiftlik Alanı (hektar)
+                    </label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      value={farmSizeHectares}
+                      onChange={(e) => setFarmSizeHectares(e.target.value)}
+                      placeholder="örn. 94.59"
+                      className="w-full border border-gray-300 rounded-lg px-3 py-2 text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Ana Ürünler</label>
+                    <input
+                      type="text"
+                      value={primaryCrops}
+                      onChange={(e) => setPrimaryCrops(e.target.value)}
+                      placeholder="örn. buğday, mısır, pamuk"
+                      className="w-full border border-gray-300 rounded-lg px-3 py-2 text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                    <p className="text-xs text-gray-500 mt-1">Virgülle ayırarak birden fazla ürün girebilirsin.</p>
+                  </div>
+                </div>
+
+                {error && (
+                  <div className="mt-4 bg-red-50 border border-red-200 rounded-lg p-3">
+                    <p className="text-red-600 text-sm">{error}</p>
+                  </div>
+                )}
+
+                {saveSuccess && (
+                  <div className="mt-4 bg-green-50 border border-green-200 rounded-lg p-3">
+                    <p className="text-green-700 text-sm">✓ Profil güncellendi</p>
+                  </div>
+                )}
+
                 <button
-                  onClick={handleUpdateProfile}
-                  disabled={updating}
-                  className="w-full bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white px-4 py-2 rounded-lg font-medium"
+                  onClick={handleSave}
+                  disabled={saving}
+                  className="mt-6 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white px-6 py-2 rounded-lg font-medium"
                 >
-                  {updating ? "Kaydediliyor..." : "Kaydet"}
-                </button>
-              )}
-            </div>
-          </div>
-
-          {/* Şifre Değişikliği */}
-          <div className="bg-white border rounded-lg p-6">
-            <div className="flex justify-between items-center mb-4">
-              <h2 className="text-lg font-semibold text-gray-900">Şifre Değişikliği</h2>
-              <button
-                onClick={() => setPasswordMode(!passwordMode)}
-                className="text-blue-600 hover:text-blue-700 text-sm font-medium"
-              >
-                {passwordMode ? "İptal" : "Değiştir"}
-              </button>
-            </div>
-
-            {passwordMode && (
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Eski Şifre</label>
-                  <input
-                    type="password"
-                    value={oldPassword}
-                    onChange={(e) => setOldPassword(e.target.value)}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Yeni Şifre</label>
-                  <input
-                    type="password"
-                    value={newPassword}
-                    onChange={(e) => setNewPassword(e.target.value)}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Yeni Şifre (Tekrar)</label>
-                  <input
-                    type="password"
-                    value={confirmPassword}
-                    onChange={(e) => setConfirmPassword(e.target.value)}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg"
-                  />
-                </div>
-
-                <button
-                  onClick={handleChangePassword}
-                  disabled={updating}
-                  className="w-full bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white px-4 py-2 rounded-lg font-medium"
-                >
-                  {updating ? "Değiştiriliyor..." : "Şifre Değiştir"}
+                  {saving ? "Kaydediliyor..." : "Kaydet"}
                 </button>
               </div>
-            )}
-          </div>
+
+              {/* Şifre değiştirme */}
+              <div className="bg-white rounded-lg shadow border border-gray-200 p-6">
+                <h2 className="text-lg font-semibold text-gray-900 mb-4">🔒 Şifre Değiştir</h2>
+
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Mevcut Şifre</label>
+                    <input
+                      type="password"
+                      value={oldPassword}
+                      onChange={(e) => setOldPassword(e.target.value)}
+                      className="w-full border border-gray-300 rounded-lg px-3 py-2 text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Yeni Şifre</label>
+                    <input
+                      type="password"
+                      value={newPassword}
+                      onChange={(e) => setNewPassword(e.target.value)}
+                      placeholder="En az 6 karakter"
+                      className="w-full border border-gray-300 rounded-lg px-3 py-2 text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Yeni Şifre (Tekrar)</label>
+                    <input
+                      type="password"
+                      value={confirmPassword}
+                      onChange={(e) => setConfirmPassword(e.target.value)}
+                      className="w-full border border-gray-300 rounded-lg px-3 py-2 text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
+                </div>
+
+                {passwordError && (
+                  <div className="mt-4 bg-red-50 border border-red-200 rounded-lg p-3">
+                    <p className="text-red-600 text-sm">{passwordError}</p>
+                  </div>
+                )}
+
+                {passwordSuccess && (
+                  <div className="mt-4 bg-green-50 border border-green-200 rounded-lg p-3">
+                    <p className="text-green-700 text-sm">✓ Şifre değiştirildi</p>
+                  </div>
+                )}
+
+                <button
+                  onClick={handlePasswordChange}
+                  disabled={passwordSaving}
+                  className="mt-6 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white px-6 py-2 rounded-lg font-medium"
+                >
+                  {passwordSaving ? "Değiştiriliyor..." : "Şifreyi Değiştir"}
+                </button>
+              </div>
+            </>
+          ) : null}
         </div>
       </div>
     </div>
