@@ -42,6 +42,16 @@ class Farmer(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
     last_login = Column(DateTime, nullable=True)
 
+    # Admin Approval & KVKK (MVP Faz 0)
+    is_approved = Column(Boolean, default=False)  # Admin onayı gerekli
+    approved_at = Column(DateTime, nullable=True)  # Admin tarafından onaylandı
+    is_admin = Column(Boolean, default=False)  # Admin dashboard erişimi
+    
+    # KVKK Compliance
+    kvkk_consent = Column(Boolean, default=False)  # Gizlilik politikası onayı
+    kvkk_consent_date = Column(DateTime, nullable=True)  # Rıza tarihi
+    approval_notes = Column(String, nullable=True)  # Admin notu (reddedildi mi, neden?)
+
     # Profile
     farm_size_hectares = Column(Float, nullable=True)
     primary_crops = Column(String, nullable=True)  # JSON: ["wheat", "corn"]

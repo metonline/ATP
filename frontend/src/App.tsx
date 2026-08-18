@@ -1,101 +1,42 @@
-import React, { useEffect } from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
-import { useAuthStore } from './store/auth';
+import React from "react";
+import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-dom";
+import { useAuthStore } from "./store/auth";
+import { LanguageSwitcher } from "./components/LanguageSwitcher";
+import DashboardPage from "./pages/DashboardPage";
+import LoginPage from "./pages/LoginPage";
+import RegisterPage from "./pages/RegisterPage";
+import MapPage from "./pages/MapPage";
+import ParcelPage from "./pages/ParcelPage";
+import ProfilePage from "./pages/ProfilePage";
+import SatellitePage from "./pages/SatellitePage";
+import PrivacyPolicy from "./pages/PrivacyPolicy";
+import AdminPanel from "./pages/AdminPanel";
 
-// Pages
-import LoginPage from './pages/LoginPage';
-import RegisterPage from './pages/RegisterPage';
-import DashboardPage from './pages/DashboardPage';
-import MapPage from './pages/MapPage';
-import ParcelPage from './pages/ParcelPage';
-import SatellitePage from './pages/SatellitePage';
-import ProfilePage from './pages/ProfilePage';
-
-// Components
-import Header from './components/Header';
-import ProtectedRoute from './components/ProtectedRoute';
-
-// PWA Service Worker registration
-// Service worker sadece production build'de aktif — dev modda (npm run dev)
-// Vite dosyaları hash'siz/sabit URL'lerle servis ettiği için service worker
-// eski kodu cache'leyip yanıltıcı davranabiliyor. import.meta.env.PROD sadece
-// gerçek `npm run build` çıktısında true olur.
-if ('serviceWorker' in navigator && import.meta.env.PROD) {
-  navigator.serviceWorker.register('/sw.js');
-}
+const ProtectedRoute = ({ element }: { element: React.ReactNode }) => {
+  const { token } = useAuthStore();
+  return token ? element : <Navigate to="/login" />;
+};
 
 export default function App() {
-  const { token, initializeAuth } = useAuthStore();
-
-  useEffect(() => {
-    initializeAuth();
-  }, []);
-
   return (
-    <Router>
-      <div className="min-h-screen bg-gray-50">
-        {token && <Header />}
-
-        <main className="w-full">
-          <Routes>
-            {/* Public routes */}
-            <Route path="/login" element={<LoginPage />} />
-            <Route path="/register" element={<RegisterPage />} />
-
-            {/* Protected routes */}
-            <Route
-              path="/dashboard"
-              element={
-                <ProtectedRoute>
-                  <DashboardPage />
-                </ProtectedRoute>
-              }
-            />
-
-            <Route
-              path="/map"
-              element={
-                <ProtectedRoute>
-                  <MapPage />
-                </ProtectedRoute>
-              }
-            />
-
-            <Route
-              path="/parcels"
-              element={
-                <ProtectedRoute>
-                  <ParcelPage />
-                </ProtectedRoute>
-              }
-            />
-
-            <Route
-              path="/parcels/:parcelId/satellite"
-              element={
-                <ProtectedRoute>
-                  <SatellitePage />
-                </ProtectedRoute>
-              }
-            />
-
-            <Route
-              path="/profile"
-              element={
-                <ProtectedRoute>
-                  <ProfilePage />
-                </ProtectedRoute>
-              }
-            />
-
-            {/* Redirect */}
-            <Route
-              path="/"
-              element={<Navigate to={token ? "/dashboard" : "/login"} replace />}
-            />
-          </Routes>
-        </main>
+    <>
+      <div className="flex justify-end p-4 bg-gray-100">
+        <LanguageSwitcher />
       </div>
-    </Router>
+      <Router>
+        <Routes>
+          <Route path="/login" element={<LoginPage />} />
+          <Route path="/register" element={<RegisterPage />} />
+          <Route path="/privacy-policy" element={<PrivacyPolicy />} />
+          <Route path="/admin" element={<AdminPanel />} />
+          <Route path="/dashboard" element={<ProtectedRoute element={<DashboardPage />} />} />
+          <Route path="/map" element={<ProtectedRoute element={<MapPage />} />} />
+          <Route path="/parcel/:id" element={<ProtectedRoute element={<ParcelPage />} />} />
+          <Route path="/profile" element={<ProtectedRoute element={<ProfilePage />} />} />
+          <Route path="/satellite/:parcelId" element={<ProtectedRoute element={<SatellitePage />} />} />
+          <Route path="/" element={<Navigate to="/dashboard" />} />
+        </Routes>
+      </Router>
+    </>
   );
 }

@@ -2,6 +2,62 @@
 
 **Son güncelleme:** 18 Ağustos 2026
 
+## İş Modeli & Geniş Perspektif
+
+**Kaynak:** `00_EXECUTIVE_SUMMARY_EN.md` (25 sayfalık tam doküman, yatırımcı sunumu formatında — rakamlar/detaylar için oraya bak, burada sadece mühendislik kararlarını etkileyecek özet var)
+
+**Vizyon:** Türkiye'nin 3 milyon çiftçisine yönelik, entegre 5 katmanlı dijital tarım platformu. Şu an kodladığımız ATP, bu büyük vizyonun **sadece bir parçası** — aşağıdaki modül haritasında nerede durduğumuzu kaybetmemek önemli.
+
+### 6 Ana Modül + Uzman Pazaryeri
+
+| Modül | Ne yapıyor | ATP'deki şu anki durumu |
+|---|---|---|
+| **FMIS.Agro** (Üretim Planlama ERP) | Parsel bazlı 90 günlük üretim planı, günlük rutin/raporlama, danışman check-in'leri | ❌ Hiç yok |
+| **FMIS.Monitor** (Uydu + IoT) | NDVI/bitki sağlığı, hava durumu uyarıları, toprak sensörleri, hastalık erken uyarı | ✅ **Bunun çekirdeği var** — parsel yönetimi + 6 spektral indeks (NDVI/NDRE/NDMI/EVI/SAVI/GNDVI). IoT sensör/hava durumu/hastalık AI'ı henüz yok. |
+| **FMIS.Livestock** (Veteriner AI) | Giyilebilir izleme, AI teşhis | ❌ Hiç yok |
+| **FMIS.Equipment** (P2P Pazaryeri) | Traktör/ekipman kiralama, eşleştirme, escrow | ❌ Hiç yok |
+| **FMIS.AI-Helpdesk** (7/24 Danışmanlık) | Chatbot + uzmana yönlendirme | ❌ Hiç yok |
+| **FMIS.Market-Access** (B2B + B2C) | B2B: gıda şirketi direkt tedarik. B2C: QR ile çiftlikten-tüketiciye şeffaflık | ❌ Hiç yok |
+| **Uzman Danışman Pazaryeri** | 300+ doğrulanmış agronomist, proje bazlı fiyatlama | ❌ Hiç yok |
+
+### Mimari açıdan önemli çıkarım: Çoklu paydaş tipi
+
+Vizyon en az **4 farklı kullanıcı/paydaş tipi** öngörüyor:
+1. **Çiftçi** (şu an tek var olan: `Farmer` modeli)
+2. **Uzman/Danışman** (agronomist — proje bazlı çalışan, kendi profili/değerlendirmesi olan ayrı bir rol)
+3. **B2B Alıcı** (gıda şirketi — tedarik zinciri görünürlüğü isteyen kurumsal hesap)
+4. **Tüketici** (B2C — sadece QR ile izleme yapan, muhtemelen hesapsız/hafif bir arayüz)
+
+Şu anki `database.py`'de sadece `Farmer` var. İleride `FMIS.AI-Helpdesk` ya da uzman pazaryeri gibi modüller eklenirse, **auth/rol sistemi baştan tasarlanmalı** — mevcut tek-rollü yapıya sonradan yama yapmak yerine.
+
+### Çok-modlu veri girişi vizyonu
+Platform, çiftçilerin doğal kullandığı **7 farklı kanaldan** veri kabul etmeyi hedefliyor: sesli komut (STT+NLP), fotoğraf (OCR/CV — fatura, hastalık teşhisi), video, form, SMS/WhatsApp, IoT sensör, AR. Şu an ATP sadece klasik form/web arayüzü kullanıyor — bu vizyonun neredeyse hiçbiri henüz yok, ama ileride "parsel düzenleme formunu sesle doldurma" gibi özellikler istenirse bu doküman referans olur.
+
+### İkinci kaynak: "Dört Eşit Misyon" çerçevesi
+
+**Kaynak:** `02_DETAYLI_IS_MODELI_BILINGUAL.docx`
+
+Bu doküman, 6 Modül mimarisiyle **çelişmiyor**, farklı bir seviyede tamamlıyor: 6 Modül *ürün/özellik* mimarisini tarif ederken, bu doküman platformun **stratejik/iş misyonunu** 4 eşit ayak üzerinden anlatıyor:
+
+1. **Uzman Tarım Verisi + AI Öğrenme** — üniversiteler/araştırma enstitüleri/çiftçi feedback'inden merkezi bilgi kütüphanesi, AI üretim sonuçlarından öğrenir
+2. **Ücretsiz Bilgi Yayınlanması (satıcı sponsorlu)** — Corteva/AGCO/Syngenta gibi girdi şirketleri sponsorluğuyla, çiftçiye ücretsiz webinar/SMS/WhatsApp içeriği → viral benimseme
+3. **7/24 AI Yardım Masası** — SMS/WhatsApp/uygulama üzerinden %90 otomatik yanıt, zor sorular insan agronoma escalate; 5+ dil (TR, Kürtçe, Arapça, İngilizce, Almanca)
+4. **Ekipman Booking + B2B Pazarı** — platform taraf olmuyor, sadece listing/booking/rating altyapısı; e-ticaret kanalında %2 komisyon
+
+**9 Gelir Akışı (Yıl 2 hedefi ~14.8M USD):** E-ticaret komisyonu, ekipman premium üyelik, girdi şirketi sponsorluğu, reklam, premium abonelik (çiftçi odaklı — toplam ~8.25M) + Gıda Sanayii/Lojistik/Banka/TARSIM veri paketleri (B2B, yüksek marj — toplam ~6.55M).
+
+**Çok paydaşlı veri ekosistemi (isimli örnekler):** Ülker Gıda, Bursayan Lojistik, Türk Tarım Bankası/Ziraatbank/VakıfBank, TARSIM — her biri platformdan farklı bir veri paketi alıp yıllık belirli bir gelir katkısı yapıyor olarak modellenmiş.
+
+**Teknik altyapı uyumu (doğrudan bizim kod tabanımızla ilgili):**
+- ✅ **Sentinel/Copernicus (ücretsiz uydu verisi)** — ATP zaten bunu kullanıyor (`COPERNICUS/S2_SR_HARMONIZED`)
+- ✅ **Leaflet** — ATP zaten bunu kullanıyor (`MapPage.tsx`, `ParcelPage.tsx`)
+- ⚠️ **PostGIS öngörülüyor, biz düz SQLite kullanıyoruz** — GeoJSON şu an sadece bir text kolonunda duruyor, gerçek mekansal sorgular (örn. "bana X km yarıçapındaki parselleri getir") gerekirse bu bir geçiş noktası olur
+- Hedeflenen ölçek: 8000+ çiftçi, kubernetes/GCP/AWS auto-scaling — şu anki Render free tier kurulumu bu ölçeğin çok gerisinde, bilinçli bir MVP/pilot aşaması kararı olarak görülmeli
+
+**Pazara giriş zaman çizelgesi:** Ay 3'te 100 çiftçi pilotu (Ankara) → Ay 6'da 500 çiftçi → Ay 12'de 4.000 çiftçi → Ay 18-20'de EBITDA pozitif (20K çiftçi) → Ay 24'te Series A.
+
+---
+
 ## Ne bu proje
 Tarım/parsel yönetimi + uydu görüntüsü tabanlı bitki analizi platformu.
 FastAPI + SQLite backend, React/TypeScript/Vite PWA frontend.

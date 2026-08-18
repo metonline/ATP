@@ -107,7 +107,7 @@ export const useAuthStore = create<AuthStore>((set) => ({
     }
   },
 
-  register: async (email: string, username: string, password: string, fullName: string) => {
+  register: async (email: string, username: string, password: string, fullName: string, kvkkConsent: boolean) => {
     set({ loading: true, error: null });
     try {
       const response = await api.post('/api/auth/register', {
@@ -115,6 +115,7 @@ export const useAuthStore = create<AuthStore>((set) => ({
         username,
         password,
         full_name: fullName,
+    kvkk_consent: kvkkConsent,
       });
       const { access_token, farmer_id } = response.data;
 

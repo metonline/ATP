@@ -32,16 +32,17 @@ app = FastAPI(
     version="1.0.0-mvp"
 )
 
+# CORS middleware for frontend
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=['*'],
+    allow_origins=["*"],
+        "ALLOWED_ORIGINS",
+        "http://localhost:5173,https://atp-1-wr8s.onrender.com"
+    ).split(","),
     allow_credentials=True,
-    allow_methods=['*'],
-    allow_headers=['*'],
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
-
-
-# CORS middleware for frontend
 
 
 # Tüm /api/ cevaplarının tarayıcı tarafından cache'lenmesini engeller.
@@ -203,7 +204,7 @@ class SatelliteImageResponse(BaseModel):
 # HELPER FUNCTIONS
 # ============================================================================
 
-def extract_token_from_header(authorization: Optional[str]) -> Optional[str]:
+def extract_token_from_header(authorization: Optional[str] = Header(None)) -> Optional[str]:
     """Extract Bearer token from Authorization header"""
     print(f"[DEBUG] Authorization header received: {authorization[:50] if authorization else 'None'}...")
     if not authorization:
@@ -218,7 +219,7 @@ def extract_token_from_header(authorization: Optional[str]) -> Optional[str]:
     return None
 
 
-def get_current_farmer(token: str, db: Session) -> Farmer:
+def get_current_farmer(token: str = None, db: Session = Depends(get_db)) -> Farmer:
     """Verify JWT token and return current farmer"""
     print(f"[DEBUG] get_current_farmer called with token: {token[:50] if token else 'None'}...")
     if not token:
@@ -1044,10 +1045,10 @@ async def change_password(
 # ADMIN PANEL ENDPOINTS
 # ============================================================================
 
-def get_current_admin(token: str, db: Session) -> Farmer:
+def get_current_admin(token: str = None, db: Session = Depends(get_db)) -> Farmer:
     """Verify JWT token and return current farmer (must be admin)"""
     farmer = get_current_farmer(token, db)
-    if not farmer or not farmer.is_admin:
+    if not farmer.is_admin:
         raise HTTPException(status_code=403, detail="Admin access required")
     return farmer
 
