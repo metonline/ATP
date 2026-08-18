@@ -67,6 +67,7 @@
     alreadyMember: "Already have an account? Sign In"
   },
   login: {
+    heroTitle: "Intelligent Agro-Platform",
     title: "Sign In",
     email: "Email",
     password: "Password",
@@ -332,6 +333,7 @@ export const tr = {
     alreadyMember: "Zaten hesabın var mı? Giriş Yap"
   },
   login: {
+    heroTitle: "Akıllı Tarım Platformu",
     title: "Giriş Yap",
     email: "Email",
     password: "Şifre",

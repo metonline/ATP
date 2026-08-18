@@ -40,9 +40,8 @@ export default function LoginPage() {
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-green-50 to-blue-50 px-4">
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
-          <h1 className="text-4xl font-bold text-gray-900 mb-2">🌾 {t('header.brand')}</h1>
-          <p className="text-gray-600 mb-4">{t('dashboard.subtitle')}</p>
-          <div className="flex justify-center">
+          <h1 className="text-2xl font-bold text-gray-900 mb-2">🌾 {t('login.heroTitle')}</h1>
+          <div className="flex justify-center mt-4">
             <LanguageSwitcher />
           </div>
         </div>

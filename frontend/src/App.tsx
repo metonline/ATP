@@ -27,7 +27,7 @@ export default function App() {
           <Route path="/login" element={<LoginPage />} />
           <Route path="/register" element={<RegisterPage />} />
           <Route path="/privacy-policy" element={<PrivacyPolicy />} />
-          <Route path="/admin" element={<AdminPanel />} />
+          <Route path="/admin" element={<ProtectedRoute element={<AdminPanel />} />} />
           <Route path="/dashboard" element={<ProtectedRoute element={<DashboardPage />} />} />
           <Route path="/map" element={<ProtectedRoute element={<MapPage />} />} />
           <Route path="/parcel/:id" element={<ProtectedRoute element={<ParcelPage />} />} />

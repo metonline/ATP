@@ -21,7 +21,7 @@ interface AuthStore {
   // Actions
   initializeAuth: () => void;
   login: (email: string, password: string) => Promise<void>;
-  register: (email: string, username: string, password: string, fullName: string) => Promise<void>;
+  register: (email: string, username: string, password: string, fullName: string, kvkkConsent: boolean) => Promise<any>;
   logout: () => void;
   setToken: (token: string) => void;
 }
@@ -119,6 +119,19 @@ export const useAuthStore = create<AuthStore>((set) => ({
       });
       const { access_token, farmer_id } = response.data;
 
+      // Admin onayı bekleyen kayıtlarda backend token/farmer_id döndürmüyor
+      // (henüz onaylanmamış birine token vermek mantıklı değil). Bu durumda
+      // otomatik giriş yapmaya çalışmadan, sonucu olduğu gibi çağırana
+      // döndürüyoruz — RegisterPage bu response.status'a bakıp
+      // "onay bekliyor" mesajını gösteriyor. Bunu atlayıp farmer_id.toString()
+      // çağırmak (farmer_id undefined olduğu için) sessizce patlıyordu ve
+      // kayıt backend'de başarıyla tamamlanmış olsa bile kullanıcıya
+      // "Registration failed" gösteriyordu.
+      if (!access_token || !farmer_id) {
+        set({ loading: false });
+        return response.data;
+      }
+
       // Store token
       localStorage.setItem('token', access_token);
       localStorage.setItem('farmer_id', farmer_id.toString());
@@ -129,6 +142,8 @@ export const useAuthStore = create<AuthStore>((set) => ({
         farmer: { id: farmer_id, email, username, full_name: fullName },
         loading: false,
       });
+
+      return response.data;
     } catch (error: any) {
       const errorMessage = error.response?.data?.detail || 'Registration failed';
       set({ error: errorMessage, loading: false });
