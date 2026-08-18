@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { useParams } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { api } from "../store/auth";
 
 interface SatelliteData {
@@ -27,62 +28,62 @@ type IndexKey = "ndvi" | "ndre" | "ndmi" | "evi" | "savi" | "gndvi";
 
 interface LayerDef {
   key: "rgb" | IndexKey;
-  label: string;
+  labelKey: string;
   icon: string;
-  description: string;
+  descKey: string;
 }
 
 const LAYERS: LayerDef[] = [
-  { key: "rgb", label: "Gerçek Renkli", icon: "🖼️", description: "Sentinel-2 doğal renk görüntüsü" },
-  { key: "ndvi", label: "NDVI", icon: "🌱", description: "Genel bitki sağlığı / yeşillik" },
-  { key: "ndre", label: "NDRE", icon: "🍃", description: "Klorofil yoğunluğu, olgun bitkide NDVI'den daha hassas" },
-  { key: "ndmi", label: "NDMI", icon: "💧", description: "Bitki/toprak nem durumu — sulama kararı için" },
-  { key: "evi", label: "EVI", icon: "🌿", description: "Gelişmiş bitki indeksi — atmosfer/toprak gürültüsü azaltılmış" },
-  { key: "savi", label: "SAVI", icon: "🌾", description: "Toprak parlaklığından etkilenmeyen bitki indeksi" },
-  { key: "gndvi", label: "GNDVI", icon: "🍀", description: "Klorofil konsantrasyonuna NDVI'den daha duyarlı" },
+  { key: "rgb", labelKey: "satellite.layerRgb", icon: "🖼️", descKey: "satellite.descRgb" },
+  { key: "ndvi", labelKey: "satellite.layerNdvi", icon: "🌱", descKey: "satellite.descNdvi" },
+  { key: "ndre", labelKey: "satellite.layerNdre", icon: "🍃", descKey: "satellite.descNdre" },
+  { key: "ndmi", labelKey: "satellite.layerNdmi", icon: "💧", descKey: "satellite.descNdmi" },
+  { key: "evi", labelKey: "satellite.layerEvi", icon: "🌿", descKey: "satellite.descEvi" },
+  { key: "savi", labelKey: "satellite.layerSavi", icon: "🌾", descKey: "satellite.descSavi" },
+  { key: "gndvi", labelKey: "satellite.layerGndvi", icon: "🍀", descKey: "satellite.descGndvi" },
 ];
 
-function getVegetationStatus(value: number): { label: string; bg: string; border: string; text: string } {
+function getVegetationStatus(value: number): { labelKey: string; bg: string; border: string; text: string } {
   if (value < 0.2) {
-    return { label: "Çıplak toprak / bitki örtüsü yok", bg: "bg-red-50", border: "border-red-200", text: "text-red-700" };
+    return { labelKey: "satellite.statusBareSoil", bg: "bg-red-50", border: "border-red-200", text: "text-red-700" };
   } else if (value < 0.4) {
-    return { label: "Zayıf bitki örtüsü", bg: "bg-orange-50", border: "border-orange-200", text: "text-orange-700" };
+    return { labelKey: "satellite.statusWeak", bg: "bg-orange-50", border: "border-orange-200", text: "text-orange-700" };
   } else if (value < 0.6) {
-    return { label: "Orta yoğunlukta bitki örtüsü", bg: "bg-yellow-50", border: "border-yellow-200", text: "text-yellow-700" };
+    return { labelKey: "satellite.statusModerate", bg: "bg-yellow-50", border: "border-yellow-200", text: "text-yellow-700" };
   } else if (value < 0.8) {
-    return { label: "Sağlıklı bitki örtüsü", bg: "bg-green-50", border: "border-green-200", text: "text-green-700" };
+    return { labelKey: "satellite.statusHealthy", bg: "bg-green-50", border: "border-green-200", text: "text-green-700" };
   } else {
-    return { label: "Çok yoğun / sağlıklı bitki örtüsü", bg: "bg-emerald-50", border: "border-emerald-200", text: "text-emerald-700" };
+    return { labelKey: "satellite.statusVeryDense", bg: "bg-emerald-50", border: "border-emerald-200", text: "text-emerald-700" };
   }
 }
 
-function getNdreStatus(value: number): { label: string; bg: string; border: string; text: string } {
+function getNdreStatus(value: number): { labelKey: string; bg: string; border: string; text: string } {
   if (value < 0.1) {
-    return { label: "Düşük klorofil / stres belirtisi", bg: "bg-red-50", border: "border-red-200", text: "text-red-700" };
+    return { labelKey: "satellite.statusNdreLow", bg: "bg-red-50", border: "border-red-200", text: "text-red-700" };
   } else if (value < 0.2) {
-    return { label: "Orta klorofil yoğunluğu", bg: "bg-yellow-50", border: "border-yellow-200", text: "text-yellow-700" };
+    return { labelKey: "satellite.statusNdreModerate", bg: "bg-yellow-50", border: "border-yellow-200", text: "text-yellow-700" };
   } else if (value < 0.3) {
-    return { label: "İyi klorofil yoğunluğu", bg: "bg-green-50", border: "border-green-200", text: "text-green-700" };
+    return { labelKey: "satellite.statusNdreGood", bg: "bg-green-50", border: "border-green-200", text: "text-green-700" };
   } else {
-    return { label: "Yüksek klorofil / olgun bitki örtüsü", bg: "bg-emerald-50", border: "border-emerald-200", text: "text-emerald-700" };
+    return { labelKey: "satellite.statusNdreHigh", bg: "bg-emerald-50", border: "border-emerald-200", text: "text-emerald-700" };
   }
 }
 
-function getNdmiStatus(value: number): { label: string; bg: string; border: string; text: string } {
+function getNdmiStatus(value: number): { labelKey: string; bg: string; border: string; text: string } {
   if (value < -0.2) {
-    return { label: "Çok kuru — sulama gerekebilir", bg: "bg-orange-50", border: "border-orange-200", text: "text-orange-700" };
+    return { labelKey: "satellite.statusNdmiVeryDry", bg: "bg-orange-50", border: "border-orange-200", text: "text-orange-700" };
   } else if (value < 0) {
-    return { label: "Kuru", bg: "bg-yellow-50", border: "border-yellow-200", text: "text-yellow-700" };
+    return { labelKey: "satellite.statusNdmiDry", bg: "bg-yellow-50", border: "border-yellow-200", text: "text-yellow-700" };
   } else if (value < 0.2) {
-    return { label: "Normal nem seviyesi", bg: "bg-teal-50", border: "border-teal-200", text: "text-teal-700" };
+    return { labelKey: "satellite.statusNdmiNormal", bg: "bg-teal-50", border: "border-teal-200", text: "text-teal-700" };
   } else if (value < 0.4) {
-    return { label: "Nemli", bg: "bg-cyan-50", border: "border-cyan-200", text: "text-cyan-700" };
+    return { labelKey: "satellite.statusNdmiMoist", bg: "bg-cyan-50", border: "border-cyan-200", text: "text-cyan-700" };
   } else {
-    return { label: "Çok nemli / su birikintisi olabilir", bg: "bg-blue-50", border: "border-blue-200", text: "text-blue-700" };
+    return { labelKey: "satellite.statusNdmiVeryMoist", bg: "bg-blue-50", border: "border-blue-200", text: "text-blue-700" };
   }
 }
 
-function getIndexStatus(key: IndexKey, value: number): { label: string; bg: string; border: string; text: string } {
+function getIndexStatus(key: IndexKey, value: number): { labelKey: string; bg: string; border: string; text: string } {
   if (key === "ndre") return getNdreStatus(value);
   if (key === "ndmi") return getNdmiStatus(value);
   return getVegetationStatus(value); // ndvi, evi, savi, gndvi — hepsi benzer bitki-sağlığı ölçeğinde
@@ -91,6 +92,7 @@ function getIndexStatus(key: IndexKey, value: number): { label: string; bg: stri
 export default function SatellitePage() {
   const params = useParams();
   const parcelId = params.parcelId;
+  const { t } = useTranslation();
 
   const [satelliteData, setSatelliteData] = useState<SatelliteData | null>(null);
   const [loading, setLoading] = useState(false);
@@ -167,15 +169,15 @@ export default function SatellitePage() {
       <div className="max-w-4xl mx-auto">
         <div className="bg-white shadow-sm border-b">
           <div className="px-6 py-4">
-            <h1 className="text-2xl font-bold text-gray-900">📡 Uydu Görüntüleri</h1>
-            <p className="text-gray-600 mt-1">Sentinel-2 uydu görüntüleri ve spektral indeksler</p>
+            <h1 className="text-2xl font-bold text-gray-900">📡 {t('satellite.title')}</h1>
+            <p className="text-gray-600 mt-1">{t('satellite.subtitle')}</p>
           </div>
         </div>
 
         <div className="p-6">
           {loading ? (
             <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-              <p className="text-blue-700">Yükleniyor...</p>
+              <p className="text-blue-700">{t('common.loading')}</p>
             </div>
           ) : satelliteData ? (
             <div className="space-y-4">
@@ -193,7 +195,7 @@ export default function SatellitePage() {
                             : "bg-white border border-gray-200 text-gray-700 hover:bg-gray-50"
                         }`}
                       >
-                        {layer.icon} {layer.label}
+                        {layer.icon} {t(layer.labelKey)}
                       </button>
                     ))}
                   </div>
@@ -208,24 +210,24 @@ export default function SatellitePage() {
                         <div className="flex items-center justify-between mb-2">
                           <div>
                             <h2 className="text-lg font-semibold text-gray-900">
-                              {layer.icon} {layer.label}
+                              {layer.icon} {t(layer.labelKey)}
                             </h2>
-                            <p className="text-sm text-gray-500">{layer.description}</p>
+                            <p className="text-sm text-gray-500">{t(layer.descKey)}</p>
                           </div>
                           <button
                             onClick={requestNewImage}
                             disabled={requesting}
                             className="text-sm bg-gray-100 hover:bg-gray-200 disabled:opacity-50 text-gray-700 px-3 py-1.5 rounded shrink-0"
                           >
-                            {requesting ? "Yenileniyor..." : "🔄 Yenile"}
+                            {requesting ? t('satellite.refreshing') : `🔄 ${t('satellite.refresh')}`}
                           </button>
                         </div>
 
                         {layerUrl ? (
-                          <img src={layerUrl} alt={layer.label} className="w-full rounded-lg shadow" />
+                          <img src={layerUrl} alt={t(layer.labelKey)} className="w-full rounded-lg shadow" />
                         ) : (
                           <div className="bg-gray-50 border border-gray-200 rounded-lg p-6 text-center text-gray-500 text-sm">
-                            Bu katman için henüz veri yok
+                            {t('satellite.noLayerData')}
                           </div>
                         )}
 
@@ -238,7 +240,7 @@ export default function SatellitePage() {
                           return (
                             <div className={`mt-3 rounded-lg p-4 border ${status.bg} ${status.border}`}>
                               <p className={`font-medium ${status.text}`}>
-                                Ortalama {layer.label}: {layerMean.toFixed(2)} — {status.label}
+                                {t('satellite.average')} {t(layer.labelKey)}: {layerMean.toFixed(2)} — {t(status.labelKey)}
                               </p>
                             </div>
                           );
@@ -249,26 +251,26 @@ export default function SatellitePage() {
                 </div>
               ) : satelliteData.status === "error" ? (
                 <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-                  <p className="text-red-700 font-medium">❌ Hata</p>
+                  <p className="text-red-700 font-medium">❌ {t('satellite.errorTitle')}</p>
                   <p className="text-red-600 text-sm mt-2">{satelliteData.error}</p>
                   <button onClick={requestNewImage} disabled={requesting} className="mt-4 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white px-4 py-2 rounded">
-                    {requesting ? "İsteniyor..." : "Tekrar İste"}
+                    {requesting ? t('satellite.requesting') : t('satellite.tryAgainRequest')}
                   </button>
                 </div>
               ) : (
                 <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
-                  <p className="text-yellow-700">⏳ Görüntü işleniyor... (6 endeks hesaplanıyor, biraz sürebilir)</p>
+                  <p className="text-yellow-700">⏳ {t('satellite.processing')}</p>
                   <button onClick={requestNewImage} disabled={requesting} className="mt-4 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white px-4 py-2 rounded">
-                    {requesting ? "İsteniyor..." : "Yeniden İste"}
+                    {requesting ? t('satellite.requesting') : t('satellite.requestAgain')}
                   </button>
                 </div>
               )}
             </div>
           ) : (
             <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
-              <p className="text-gray-700">Uydu görüntüsü bulunamadı</p>
+              <p className="text-gray-700">{t('satellite.notFound')}</p>
               <button onClick={requestNewImage} disabled={requesting} className="mt-4 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white px-4 py-2 rounded">
-                {requesting ? "İsteniyor..." : "İlk Görüntüyü İste"}
+                {requesting ? t('satellite.requesting') : t('satellite.requestFirst')}
               </button>
             </div>
           )}

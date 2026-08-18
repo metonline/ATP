@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { MapContainer, TileLayer, Polygon } from 'react-leaflet';
+import { useTranslation } from 'react-i18next';
 import { api } from '../store/auth';
 
 interface Parcel {
@@ -15,6 +16,7 @@ interface Parcel {
 }
 
 export default function ParcelPage() {
+  const { t } = useTranslation();
   const [parcels, setParcels] = useState<Parcel[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -29,7 +31,7 @@ export default function ParcelPage() {
       const response = await api.get('/api/parcels');
       setParcels(response.data);
     } catch (err: any) {
-      setError(err.response?.data?.detail || 'Failed to load parcels');
+      setError(err.response?.data?.detail || t('parcel.loadError'));
     } finally {
       setLoading(false);
     }
@@ -38,7 +40,7 @@ export default function ParcelPage() {
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <p className="text-gray-600">Yükleniyor...</p>
+        <p className="text-gray-600">{t('common.loading')}</p>
       </div>
     );
   }
@@ -49,8 +51,8 @@ export default function ParcelPage() {
         {/* Header */}
         <div className="bg-white shadow-sm border-b">
           <div className="px-6 py-4">
-            <h1 className="text-2xl font-bold text-gray-900">📋 Parselerim</h1>
-            <p className="text-gray-600 mt-1">Tüm parsellerinizi burada görebilirsiniz</p>
+            <h1 className="text-2xl font-bold text-gray-900">📋 {t('parcel.title')}</h1>
+            <p className="text-gray-600 mt-1">{t('parcel.subtitle')}</p>
           </div>
         </div>
 
@@ -63,15 +65,15 @@ export default function ParcelPage() {
 
           {parcels.length === 0 ? (
             <div className="bg-blue-50 border border-blue-200 rounded-lg p-8 text-center">
-              <p className="text-blue-900 font-medium mb-3">Henüz parsel yok</p>
+              <p className="text-blue-900 font-medium mb-3">{t('parcel.noParcels')}</p>
               <p className="text-blue-800 text-sm mb-4">
-                Harita sayfasında tıklayarak yeni parsel işaretleyebilirsiniz.
+                {t('parcel.noParcelsDesc')}
               </p>
               <Link
                 to="/map"
                 className="inline-block bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded font-medium"
               >
-                Haritaya Git →
+                {t('parcel.goToMap')}
               </Link>
             </div>
           ) : (
@@ -97,19 +99,19 @@ export default function ParcelPage() {
                   {/* Content */}
                   <div className="px-4 py-4 space-y-2">
                     <div>
-                      <p className="text-xs text-gray-600">Alan</p>
+                      <p className="text-xs text-gray-600">{t('parcel.area')}</p>
                       <p className="text-lg font-semibold text-gray-900">{parcel.area_hectares} ha</p>
                     </div>
 
                     {parcel.land_cover_classification && (
                       <div>
-                        <p className="text-xs text-gray-600">Ürün Sınıfı</p>
+                        <p className="text-xs text-gray-600">{t('parcel.cropClass')}</p>
                         <p className="text-sm text-gray-900">{parcel.land_cover_classification}</p>
                       </div>
                     )}
 
                     <div>
-                      <p className="text-xs text-gray-600">Konum</p>
+                      <p className="text-xs text-gray-600">{t('parcel.location')}</p>
                       <p className="text-xs font-mono text-gray-900">
                         {parcel.centroid_lat.toFixed(4)}, {parcel.centroid_lon.toFixed(4)}
                       </p>
@@ -122,7 +124,7 @@ export default function ParcelPage() {
                       to={`/parcels/${parcel.id}/satellite`}
                       className="inline-block text-blue-600 hover:text-blue-800 font-medium text-sm"
                     >
-                      Uydu Görüntülerini Gör →
+                      {t('parcel.viewSatellite')}
                     </Link>
                   </div>
                 </div>
@@ -193,18 +195,18 @@ export default function ParcelPage() {
 
               <div className="grid grid-cols-2 gap-4 mb-6">
                 <div className="bg-blue-50 p-4 rounded-lg">
-                  <p className="text-sm text-gray-600">Alan</p>
+                  <p className="text-sm text-gray-600">{t('parcel.area')}</p>
                   <p className="text-2xl font-bold text-blue-600">{selectedParcel.area_hectares} ha</p>
                 </div>
                 <div className="bg-green-50 p-4 rounded-lg">
-                  <p className="text-sm text-gray-600">Durum</p>
-                  <p className="text-2xl font-bold text-green-600">✓ Aktif</p>
+                  <p className="text-sm text-gray-600">{t('parcel.status')}</p>
+                  <p className="text-2xl font-bold text-green-600">{t('parcel.active')}</p>
                 </div>
               </div>
 
               {selectedParcel.land_cover_classification && (
                 <div className="bg-gray-50 p-4 rounded-lg mb-6">
-                  <p className="text-sm font-medium text-gray-700">🌾 Ürün Sınıfı</p>
+                  <p className="text-sm font-medium text-gray-700">🌾 {t('parcel.cropClass')}</p>
                   <p className="text-gray-600 mt-1">{selectedParcel.land_cover_classification}</p>
                 </div>
               )}
@@ -215,29 +217,29 @@ export default function ParcelPage() {
                   state={{ editingParcelId: selectedParcel.id }}
                   className="flex-1 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded font-medium text-center"
                 >
-                  🗺️ Haritada Düzenle
+                  {t('parcel.editOnMap')}
                 </Link>
                 <button
                   onClick={async () => {
-                    if (window.confirm(`"${selectedParcel.parcel_name}" parselini silmek istediğinize emin misiniz?`)) {
+                    if (window.confirm(t('parcel.deleteConfirm', { name: selectedParcel.parcel_name }))) {
                       try {
                         await api.delete(`/api/parcels/${selectedParcel.id}`);
                         setSelectedParcel(null);
                         loadParcels();
                       } catch (err: any) {
-                        alert('Parsel silinirken hata: ' + (err.response?.data?.detail || err.message));
+                        alert(t('parcel.deleteError', { message: err.response?.data?.detail || err.message }));
                       }
                     }
                   }}
                   className="flex-1 bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded font-medium"
                 >
-                  🗑️ Sil
+                  {t('parcel.deleteButton')}
                 </button>
                 <button
                   onClick={() => setSelectedParcel(null)}
                   className="flex-1 bg-gray-300 hover:bg-gray-400 text-gray-800 px-4 py-2 rounded font-medium"
                 >
-                  Kapat
+                  {t('common.close')}
                 </button>
               </div>
             </div>

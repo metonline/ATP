@@ -1,10 +1,12 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { useAuthStore } from '../store/auth';
 import { LanguageSwitcher } from './LanguageSwitcher';
 
 export default function Header() {
   const navigate = useNavigate();
+  const { t } = useTranslation();
   const { logout, farmer } = useAuthStore();
   const [menuOpen, setMenuOpen] = useState(false);
 
@@ -19,7 +21,7 @@ export default function Header() {
         {/* Logo */}
         <Link to="/dashboard" className="flex items-center gap-2 font-bold text-lg">
           <span className="text-2xl">🌾</span>
-          <span className="text-gray-900">IA Platform</span>
+          <span className="text-gray-900">{t('header.brand')}</span>
         </Link>
 
         {/* Nav Links */}
@@ -28,19 +30,19 @@ export default function Header() {
             to="/dashboard"
             className="text-gray-600 hover:text-gray-900 font-medium transition"
           >
-            Kontrol Paneli
+            {t('header.dashboard')}
           </Link>
           <Link
             to="/map"
             className="text-gray-600 hover:text-gray-900 font-medium transition"
           >
-            Harita
+            {t('header.map')}
           </Link>
           <Link
             to="/parcels"
             className="text-gray-600 hover:text-gray-900 font-medium transition"
           >
-            Parseller
+            {t('header.parcels')}
           </Link>
         </nav>
 
@@ -68,13 +70,13 @@ export default function Header() {
                   onClick={() => setMenuOpen(false)}
                   className="block w-full text-left px-4 py-2 text-gray-700 hover:bg-gray-50 transition font-medium text-sm"
                 >
-                  👤 Profilim
+                  👤 {t('header.myProfile')}
                 </Link>
                 <button
                   onClick={handleLogout}
                   className="w-full text-left px-4 py-2 text-red-600 hover:bg-red-50 transition font-medium text-sm"
                 >
-                  Çıkış Yap
+                  {t('header.logout')}
                 </button>
               </div>
             )}

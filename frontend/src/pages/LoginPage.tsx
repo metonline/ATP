@@ -2,6 +2,7 @@
 import { useNavigate, Link } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { useAuthStore } from "../store/auth";
+import { LanguageSwitcher } from "../components/LanguageSwitcher";
 
 export default function LoginPage() {
   const navigate = useNavigate();
@@ -39,8 +40,11 @@ export default function LoginPage() {
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-green-50 to-blue-50 px-4">
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
-          <h1 className="text-4xl font-bold text-gray-900 mb-2">🌾 IA Platform</h1>
-          <p className="text-gray-600">Precision Agriculture Intelligence</p>
+          <h1 className="text-4xl font-bold text-gray-900 mb-2">🌾 {t('header.brand')}</h1>
+          <p className="text-gray-600 mb-4">{t('dashboard.subtitle')}</p>
+          <div className="flex justify-center">
+            <LanguageSwitcher />
+          </div>
         </div>
 
         <div className="bg-white rounded-lg shadow-lg p-8">

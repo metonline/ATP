@@ -4,6 +4,7 @@ import { MapContainer, TileLayer, Marker, Popup, useMap, useMapEvents, Polygon }
 import L from 'leaflet';
 import * as turf from '@turf/turf';
 import * as EXIF from 'exif-js';
+import { useTranslation } from 'react-i18next';
 import { api } from '../store/auth';
 import { useAuthStore } from '../store/auth';
 
@@ -118,6 +119,7 @@ export default function MapPage() {
   const { farmer, token } = useAuthStore();
   const location = useLocation();
   const navigate = useNavigate();
+  const { t } = useTranslation();
   const [parcels, setParcels] = useState<Parcel[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
@@ -257,7 +259,7 @@ export default function MapPage() {
     } catch (err: any) {
       if (err.response?.status === 401) {
         console.log('[LOAD] Token invalid - session expired');
-        const errorMsg = 'âš ï¸ Oturum süresi doldu. Lütfen tekrar giriş yapınız.';
+        const errorMsg = t('map.sessionExpiredLoad');
         setError(errorMsg);
         localStorage.setItem('lastLoadError', JSON.stringify({
           status: 401,
@@ -265,7 +267,7 @@ export default function MapPage() {
           timestamp: new Date().toISOString()
         }));
       } else {
-        const errorMsg = err.response?.data?.detail || 'Parsel listesi yüklenemedi';
+        const errorMsg = err.response?.data?.detail || t('map.loadParcelsError');
         setError(errorMsg);
         localStorage.setItem('lastLoadError', JSON.stringify({
           status: err.response?.status,
@@ -292,7 +294,7 @@ export default function MapPage() {
 
   const handleAdaParselSearch = () => {
     if (!adaNo || !parselNo) {
-      setError('Lütfen Ada ve Parsel numarasını girin');
+      setError(t('map.errAdaParselRequired'));
       return;
     }
 
@@ -310,7 +312,7 @@ export default function MapPage() {
     setParcelName(`Ada: ${adaNo}, Parsel: ${parselNo}`);
     setShowForm(false);
     setPolygonPoints([]);
-    setSuccess(`✓ Parsel bulundu: ${key}`);
+    setSuccess(t('map.successParcelFound', { key }));
     setTimeout(() => setSuccess(''), 3000);
   };
 
@@ -319,12 +321,12 @@ export default function MapPage() {
     const lng = parseFloat(searchLng);
 
     if (isNaN(lat) || isNaN(lng)) {
-      setError('Lütfen geçerli koordinat girin');
+      setError(t('map.errInvalidCoordinate'));
       return;
     }
 
     if (lat < 36 || lat > 42 || lng < 26 || lng > 45) {
-      setError('Lütfen Türkiye sınırları içinde koordinat girin');
+      setError(t('map.errCoordinateOutsideTurkey'));
       return;
     }
 
@@ -333,13 +335,13 @@ export default function MapPage() {
     setParcelName(`Koordinat: ${lat.toFixed(4)}, ${lng.toFixed(4)}`);
     setShowForm(false);
     setPolygonPoints([]);
-    setSuccess(`✓ Haritaya gidildi: ${lat.toFixed(4)}, ${lng.toFixed(4)}`);
+    setSuccess(t('map.successMapNavigated', { lat: lat.toFixed(4), lng: lng.toFixed(4) }));
     setTimeout(() => setSuccess(''), 3000);
   };
 
   const handleAddressSearch = async () => {
     if (!addressSearch.trim()) {
-      setError('Lütfen bir adres girin');
+      setError(t('map.errAddressRequired'));
       return;
     }
 
@@ -351,7 +353,7 @@ export default function MapPage() {
       const results = await response.json();
 
       if (results.length === 0) {
-        setError('Adres bulunamadı. Başka bir adres deneyin.');
+        setError(t('map.errAddressNotFound'));
         return;
       }
 
@@ -364,10 +366,10 @@ export default function MapPage() {
       setParcelName(result.display_name || addressSearch);
       setShowForm(false);
       setPolygonPoints([]);
-      setSuccess(`✓ ${result.display_name} bulundu!`);
+      setSuccess(t('map.successAddressFound', { name: result.display_name }));
     } catch (err: any) {
       console.error('Adres arama hatası:', err);
-      setError('Adres arama başarısız. Lütfen tekrar deneyin.');
+      setError(t('map.errAddressSearchFailed'));
     }
   };
 
@@ -452,7 +454,7 @@ export default function MapPage() {
 
     if (!selectedParcel || polygonPoints.length < 3) {
       console.log('[SAVE] Error: parcel veya nokta yok');
-      setError('En az 3 nokta gereklidir');
+      setError(t('map.errMinPointsRequired'));
       return;
     }
 
@@ -461,7 +463,7 @@ export default function MapPage() {
       
       const geometryGeojson = convertToGeoJSON(polygonPoints);
       if (!geometryGeojson) {
-        setError('Geçersiz poligon');
+        setError(t('map.errInvalidPolygon'));
         return;
       }
 
@@ -488,7 +490,7 @@ export default function MapPage() {
         data: response.data,
         timestamp: new Date().toISOString()
       }));
-      setSuccess(`✓ Parsel "${parcelName}" güncellendi!`);
+      setSuccess(t('map.successParcelUpdated', { name: parcelName }));
       setSelectedParcel(null);
       setIsEditingParcel(false);
       setPolygonPoints([]);
@@ -511,10 +513,10 @@ export default function MapPage() {
       setTimeout(() => setSuccess(''), 3000);
     } catch (err: any) {
       console.error('Save parcel error:', err);
-      let errorMessage = 'Parsel güncellenemedi';
+      let errorMessage = t('map.errUpdateFailed');
 
       if (err.response?.status === 401) {
-        errorMessage = 'Oturum süresi doldu. Lütfen tekrar giriş yapın.';
+        errorMessage = t('map.errSessionExpiredSave');
       } else if (err.response?.data) {
         if (typeof err.response.data === 'string') {
           errorMessage = err.response.data;
@@ -549,19 +551,19 @@ export default function MapPage() {
     if (!selectedParcel) return;
 
     const confirmed = window.confirm(
-      `"${selectedParcel.parcel_name}" parselini silmek istediğine emin misin? Bu işlem geri alınamaz.`
+      t('map.deleteConfirm', { name: selectedParcel.parcel_name })
     );
     if (!confirmed) return;
 
     try {
       await api.delete(`/api/parcels/${selectedParcel.id}`);
       setParcels(parcels.filter((p) => p.id !== selectedParcel.id));
-      setSuccess('Parsel silindi.');
+      setSuccess(t('map.successParcelDeleted'));
       setShowForm(false);
       handleCancelEdit();
     } catch (err: any) {
       console.error('Error deleting parcel:', err);
-      setError(err.response?.data?.detail || 'Parsel silinemedi.');
+      setError(err.response?.data?.detail || t('map.errDeleteFailed'));
     }
   };
 
@@ -600,31 +602,29 @@ export default function MapPage() {
               setPolygonPoints([]);
 
               setSuccess(
-                `✓ Fotoğraftan konum çıkarıldı!\n📍 ${latDec.toFixed(6)}, ${lngDec.toFixed(6)}\n📏 Hassasiyet: ±5-15m`
+                t('map.successPhotoLocation', { lat: latDec.toFixed(6), lng: lngDec.toFixed(6) })
               );
               setTimeout(() => setSuccess(''), 4000);
 
               URL.revokeObjectURL(img.src);
             } else {
-              setError(
-                'Fotoğrafta GPS verisi bulunamadı. Lütfen konum özelliği etkin kameraya sahip cihaz kullanın.'
-              );
+              setError(t('map.errPhotoNoGps'));
               URL.revokeObjectURL(img.src);
             }
           });
         } catch (err: any) {
           console.error('EXIF parse error:', err);
-          setError('Fotoğraf işlenirken hata oluştu.');
+          setError(t('map.errPhotoProcessing'));
           URL.revokeObjectURL(img.src);
         }
       };
 
       img.onerror = () => {
-        setError('Fotoğraf yüklenemedi. JPEG formatı kontrol edin.');
+        setError(t('map.errPhotoLoadFailed'));
       };
     } catch (err: any) {
       console.error('Upload error:', err);
-      setError('Dosya işlenirken hata oluştu.');
+      setError(t('map.errFileProcessing'));
     }
   };
 
@@ -646,7 +646,7 @@ export default function MapPage() {
 
   const handleFinishPolygon = () => {
     if (polygonPoints.length < 3) {
-      setError('En az 3 nokta gerekli');
+      setError(t('map.errMinPointsRequired'));
       return;
     }
 
@@ -703,18 +703,18 @@ export default function MapPage() {
     setSuccess('');
 
     if (!selectedLat || !selectedLng || !parcelName || !area) {
-      setError('Lütfen tüm alanları doldurunuz');
+      setError(t('map.errAllFieldsRequired'));
       return;
     }
 
     if (polygonPoints.length < 3) {
-      setError('En az 3 nokta gerekli');
+      setError(t('map.errMinPointsRequired'));
       return;
     }
 
     const storedToken = localStorage.getItem('token');
     if (!storedToken && !token) {
-      setError('Oturum kapalı. Lütfen giriş yapınız');
+      setError(t('map.errSessionClosed'));
       return;
     }
 
@@ -723,7 +723,7 @@ export default function MapPage() {
       const geometryGeojson = convertToGeoJSON(polygonPoints);
 
       if (!geometryGeojson) {
-        setError('Geçersiz poligon');
+        setError(t('map.errInvalidPolygon'));
         return;
       }
 
@@ -740,7 +740,7 @@ export default function MapPage() {
       });
 
       setParcels([...parcels, response.data]);
-      setSuccess(`✓ Parsel "${parcelName}" işaretlendi!`);
+      setSuccess(t('map.successParcelCreated', { name: parcelName }));
 
       setParcelName('');
       setArea('');
@@ -751,7 +751,7 @@ export default function MapPage() {
 
       setTimeout(() => setSuccess(''), 3000);
     } catch (err: any) {
-      setError(err.response?.data?.detail || 'Parsel kaydedilemedi');
+      setError(err.response?.data?.detail || t('map.errCreateFailed'));
     }
   };
 
@@ -775,9 +775,9 @@ export default function MapPage() {
       <div className="max-w-7xl mx-auto">
         <div className="bg-white shadow-sm border-b">
           <div className="px-6 py-4">
-            <h1 className="text-2xl font-bold text-gray-900">🛰️ Uydu Haritası - Parsel İşaretleme</h1>
+            <h1 className="text-2xl font-bold text-gray-900">🛰️ {t('map.title')}</h1>
             <p className="text-gray-600 mt-1">
-              Uydu görüntüsü üzerinden parselinizi işaretleyebilirsiniz. Zoom: Scroll ile | Max: Level 21
+              {t('map.subtitle')}
             </p>
           </div>
         </div>
@@ -786,7 +786,7 @@ export default function MapPage() {
           <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
             <div className="lg:col-span-1 space-y-4">
               <div className="bg-emerald-50 border border-emerald-200 rounded-lg p-3">
-                <h3 className="font-semibold text-emerald-900 mb-2">✏️ Parsel Alanı Belirle</h3>
+                <h3 className="font-semibold text-emerald-900 mb-2">✏️ {t('map.defineAreaTitle')}</h3>
                 {!(searchMode === 'draw' && drawingMode) ? (
                   <button
                     onClick={() => {
@@ -795,15 +795,15 @@ export default function MapPage() {
                     }}
                     className="w-full bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-2 rounded text-sm font-medium"
                   >
-                    🖍️ Haritada Çizerek Belirle
+                    {t('map.drawOnMap')}
                   </button>
                 ) : (
                   <div className="space-y-2">
                     <p className="text-sm text-emerald-800">
-                      Haritaya tıklayarak parsel sınırını belirle (min. 3 nokta)
+                      {t('map.drawInstruction')}
                     </p>
                     <p className="text-xs text-emerald-700">
-                      Nokta sayısı: {polygonPoints.length}
+                      {t('map.pointCount', { count: polygonPoints.length })}
                     </p>
                     <div className="flex gap-2">
                       <button
@@ -811,13 +811,13 @@ export default function MapPage() {
                         disabled={polygonPoints.length < 3}
                         className="flex-1 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white px-3 py-2 rounded text-sm font-medium"
                       >
-                        Tamamla ({polygonPoints.length}/3+)
+                        {t('map.finish', { count: polygonPoints.length })}
                       </button>
                       <button
                         onClick={handleClearPolygon}
                         className="flex-1 bg-gray-400 hover:bg-gray-500 text-white px-3 py-2 rounded text-sm font-medium"
                       >
-                        Temizle
+                        {t('map.clear')}
                       </button>
                     </div>
                   </div>
@@ -825,7 +825,7 @@ export default function MapPage() {
               </div>
 
               <div className="bg-white border border-gray-200 rounded-lg p-3">
-                <h3 className="font-semibold text-gray-900 mb-2">🔍 Parsel Bulma Yöntemi</h3>
+                <h3 className="font-semibold text-gray-900 mb-2">🔍 {t('map.findMethodTitle')}</h3>
                 <div className="grid grid-cols-2 gap-2">
                   <button
                     onClick={() => {
@@ -838,7 +838,7 @@ export default function MapPage() {
                         : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                     }`}
                   >
-                    📋 Ada/Parsel
+                    📋 {t('map.methodAdaParsel')}
                   </button>
                   <button
                     onClick={() => {
@@ -851,7 +851,7 @@ export default function MapPage() {
                         : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                     }`}
                   >
-                    📍 Koordinat
+                    📍 {t('map.methodCoordinate')}
                   </button>
                   <button
                     onClick={() => {
@@ -864,7 +864,7 @@ export default function MapPage() {
                         : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                     }`}
                   >
-                    📸 Fotoğraf
+                    📸 {t('map.methodPhoto')}
                   </button>
                   <button
                     onClick={() => {
@@ -877,32 +877,32 @@ export default function MapPage() {
                         : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                     }`}
                   >
-                    🏘️ Adres
+                    🏘️ {t('map.methodAddress')}
                   </button>
                 </div>
               </div>
 
               {searchMode === 'ada-parsel' && (
                 <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                  <h3 className="font-semibold text-blue-900 mb-3">📋 Ada/Parsel Numarası</h3>
+                  <h3 className="font-semibold text-blue-900 mb-3">📋 {t('map.adaParselTitle')}</h3>
                   <div className="space-y-3">
                     <div>
-                      <label className="block text-xs font-medium text-gray-700 mb-1">Ada No</label>
+                      <label className="block text-xs font-medium text-gray-700 mb-1">{t('map.adaNoLabel')}</label>
                       <input
                         type="text"
                         value={adaNo}
                         onChange={(e) => setAdaNo(e.target.value)}
-                        placeholder="ör: 123"
+                        placeholder={t('map.adaNoPlaceholder')}
                         className="w-full px-3 py-2 border border-gray-300 rounded text-sm"
                       />
                     </div>
                     <div>
-                      <label className="block text-xs font-medium text-gray-700 mb-1">Parsel No</label>
+                      <label className="block text-xs font-medium text-gray-700 mb-1">{t('map.parselNoLabel')}</label>
                       <input
                         type="text"
                         value={parselNo}
                         onChange={(e) => setParselNo(e.target.value)}
-                        placeholder="ör: 45"
+                        placeholder={t('map.parselNoPlaceholder')}
                         className="w-full px-3 py-2 border border-gray-300 rounded text-sm"
                       />
                     </div>
@@ -910,7 +910,7 @@ export default function MapPage() {
                       onClick={handleAdaParselSearch}
                       className="w-full bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded font-medium text-sm"
                     >
-                      Ara
+                      {t('map.search')}
                     </button>
                   </div>
                 </div>
@@ -918,26 +918,26 @@ export default function MapPage() {
 
               {searchMode === 'koordinat' && (
                 <div className="bg-purple-50 border border-purple-200 rounded-lg p-4">
-                  <h3 className="font-semibold text-purple-900 mb-3">📍 Enlem/Boylam</h3>
+                  <h3 className="font-semibold text-purple-900 mb-3">📍 {t('map.coordTitle')}</h3>
                   <div className="space-y-3">
                     <div>
-                      <label className="block text-xs font-medium text-gray-700 mb-1">Enlem (N)</label>
+                      <label className="block text-xs font-medium text-gray-700 mb-1">{t('map.latLabel')}</label>
                       <input
                         type="number"
                         value={searchLat}
                         onChange={(e) => setSearchLat(e.target.value)}
-                        placeholder="ör: 38.0335"
+                        placeholder={t('map.latPlaceholder')}
                         step="0.0001"
                         className="w-full px-3 py-2 border border-gray-300 rounded text-sm"
                       />
                     </div>
                     <div>
-                      <label className="block text-xs font-medium text-gray-700 mb-1">Boylam (E)</label>
+                      <label className="block text-xs font-medium text-gray-700 mb-1">{t('map.lngLabel')}</label>
                       <input
                         type="number"
                         value={searchLng}
                         onChange={(e) => setSearchLng(e.target.value)}
-                        placeholder="ör: 27.4990"
+                        placeholder={t('map.lngPlaceholder')}
                         step="0.0001"
                         className="w-full px-3 py-2 border border-gray-300 rounded text-sm"
                       />
@@ -946,7 +946,7 @@ export default function MapPage() {
                       onClick={handleKoordinatSearch}
                       className="w-full bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded font-medium text-sm"
                     >
-                      Haritaya Git
+                      {t('map.goToMap')}
                     </button>
                   </div>
                 </div>
@@ -954,16 +954,16 @@ export default function MapPage() {
 
               {searchMode === 'address' && (
                 <div className="bg-green-50 border border-green-200 rounded-lg p-4">
-                  <h3 className="font-semibold text-green-900 mb-3">🏘️ Adres Arama</h3>
+                  <h3 className="font-semibold text-green-900 mb-3">🏘️ {t('map.addressSearchTitle')}</h3>
                   <div className="space-y-3">
                     <div>
-                      <label className="block text-xs font-medium text-gray-700 mb-1">Adres Yazın</label>
+                      <label className="block text-xs font-medium text-gray-700 mb-1">{t('map.addressLabel')}</label>
                       <input
                         type="text"
                         value={addressSearch}
                         onChange={(e) => setAddressSearch(e.target.value)}
                         onKeyPress={(e) => e.key === 'Enter' && handleAddressSearch()}
-                        placeholder="ör: Izmit Kırkpınar Köyü"
+                        placeholder={t('map.addressPlaceholder')}
                         className="w-full px-3 py-2 border border-gray-300 rounded text-sm focus:ring-2 focus:ring-green-500"
                       />
                     </div>
@@ -971,7 +971,7 @@ export default function MapPage() {
                       onClick={handleAddressSearch}
                       className="w-full bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded font-medium text-sm"
                     >
-                      Haritaya Git
+                      {t('map.goToMap')}
                     </button>
                   </div>
                 </div>
@@ -979,11 +979,11 @@ export default function MapPage() {
 
               {searchMode === 'foto' && (
                 <div className="bg-orange-50 border border-orange-200 rounded-lg p-4">
-                  <h3 className="font-semibold text-orange-900 mb-3">📸 Fotoğraftan Konum</h3>
+                  <h3 className="font-semibold text-orange-900 mb-3">📸 {t('map.photoLocationTitle')}</h3>
                   <div className="space-y-3">
                     <div>
                       <label className="block text-xs font-medium text-gray-700 mb-2">
-                        Konum Verili Fotoğraf Seç
+                        {t('map.photoSelectLabel')}
                       </label>
                       <input
                         type="file"
@@ -994,10 +994,10 @@ export default function MapPage() {
                     </div>
                     {photoExifData && (
                       <div className="bg-white p-3 rounded border border-orange-200 text-xs">
-                        <p className="font-medium text-gray-900 mb-2">📷 Fotoğraf EXIF Verisi:</p>
+                        <p className="font-medium text-gray-900 mb-2">{t('map.photoExifData')}</p>
                         {photoExifData.latitude && photoExifData.longitude && (
                           <p className="text-gray-700">
-                            📍 Konum: {photoExifData.latitude.toFixed(6)}, {photoExifData.longitude.toFixed(6)}
+                            {t('map.photoLocation', { lat: photoExifData.latitude.toFixed(6), lng: photoExifData.longitude.toFixed(6) })}
                           </p>
                         )}
                       </div>
@@ -1027,28 +1027,28 @@ export default function MapPage() {
               {showForm && selectedLat && selectedLng && (
                 <div className="bg-white border border-gray-200 rounded-lg p-4">
                   <h3 className="font-semibold text-gray-900 mb-3">
-                    {isEditingParcel ? '✏️ Parsel Düzenle' : 'Parsel Detayları'}
+                    {isEditingParcel ? `✏️ ${t('map.formEditTitle')}` : t('map.formDetailsTitle')}
                   </h3>
                   <form onSubmit={isEditingParcel ? handleSaveEditedParcel : handleSubmitParcel} className="space-y-3">
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Parsel Adı</label>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">{t('map.parcelNameLabel')}</label>
                       <input
                         type="text"
                         value={parcelName}
                         onChange={(e) => setParcelName(e.target.value)}
-                        placeholder="ör: A Alanı"
+                        placeholder={t('map.parcelNamePlaceholder')}
                         className="w-full px-3 py-2 border border-gray-300 rounded text-sm focus:ring-2 focus:ring-green-500"
                       />
                     </div>
 
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Alan (hektar)</label>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">{t('map.areaLabel')}</label>
                       <input
                         type="number"
                         step="0.1"
                         value={area}
                         onChange={(e) => setArea(e.target.value)}
-                        placeholder="ör: 5.5"
+                        placeholder={t('map.areaPlaceholder')}
                         className="w-full px-3 py-2 border border-gray-300 rounded text-sm focus:ring-2 focus:ring-green-500"
                       />
                     </div>
@@ -1062,14 +1062,14 @@ export default function MapPage() {
                         type="submit"
                         className="flex-1 bg-green-600 hover:bg-green-700 text-white px-3 py-2 rounded text-sm font-medium"
                       >
-                        Kaydet
+                        {t('common.save')}
                       </button>
                       <button
                         type="button"
                         onClick={() => setShowForm(false)}
                         className="flex-1 bg-gray-200 hover:bg-gray-300 text-gray-700 px-3 py-2 rounded text-sm font-medium"
                       >
-                        İptal
+                        {t('common.cancel')}
                       </button>
                     </div>
 
@@ -1080,14 +1080,14 @@ export default function MapPage() {
                           onClick={() => navigate(`/parcels/${selectedParcel.id}/satellite`)}
                           className="w-full bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-2 rounded text-sm font-medium"
                         >
-                          🛰️ Uydu Görüntüleri ve İndeksler
+                          {t('map.satelliteAndIndices')}
                         </button>
                         <button
                           type="button"
                           onClick={handleDeleteParcel}
                           className="w-full bg-red-600 hover:bg-red-700 text-white px-3 py-2 rounded text-sm font-medium"
                         >
-                          🗑️ Parseli Sil
+                          {t('map.deleteParcel')}
                         </button>
                       </>
                     )}
@@ -1097,16 +1097,16 @@ export default function MapPage() {
 
               <div className="bg-white border border-gray-200 rounded-lg p-4">
                 <h3 className="font-semibold text-gray-900 mb-3">
-                  Parselerim ({parcels.length})
+                  {t('map.myParcelsCount', { count: parcels.length })}
                 </h3>
                 {isEditingParcel ? (
                   <div className="bg-blue-50 border border-blue-200 rounded p-3 text-sm">
-                    <p className="text-blue-800 font-medium">✏️ Düzenleme Modu Aktif</p>
+                    <p className="text-blue-800 font-medium">{t('map.editModeActive')}</p>
                   </div>
                 ) : loading ? (
-                  <p className="text-gray-500 text-sm">Yükleniyor...</p>
+                  <p className="text-gray-500 text-sm">{t('common.loading')}</p>
                 ) : parcels.length === 0 ? (
-                  <p className="text-gray-500 text-sm">Henüz parsel işaretlediniz.</p>
+                  <p className="text-gray-500 text-sm">{t('map.noParcelsYet')}</p>
                 ) : (
                   <ul className="space-y-2 max-h-96 overflow-y-auto">
                     {parcels.map((parcel) => (
@@ -1117,14 +1117,14 @@ export default function MapPage() {
                       >
                         <div>
                           <p className="font-medium text-gray-900">📍 {parcel.parcel_name}</p>
-                          <p className="text-xs text-gray-600 mt-1">{parcel.area_hectares} hektar</p>
+                          <p className="text-xs text-gray-600 mt-1">{parcel.area_hectares} {t('common.hectares')}</p>
                         </div>
                         <button
                           onClick={(e) => {
                             e.stopPropagation();
                             navigate(`/parcels/${parcel.id}/satellite`);
                           }}
-                          title="Uydu görüntüsünü görüntüle"
+                          title={t('map.viewSatelliteTitle')}
                           className="shrink-0 p-2 rounded hover:bg-blue-100 text-blue-600"
                         >
                           🛰️
@@ -1227,7 +1227,7 @@ export default function MapPage() {
                         popupAnchor: [1, -34],
                       })}
                     >
-                      <Popup>Yeni Parsel</Popup>
+                      <Popup>{t('map.newParcelPopup')}</Popup>
                     </Marker>
                   )}
 
@@ -1271,7 +1271,7 @@ export default function MapPage() {
                             },
                           }}
                         >
-                          <Popup>Nokta {idx + 1}</Popup>
+                          <Popup>{t('map.pointPopup', { number: idx + 1 })}</Popup>
                         </Marker>
                       ))}
                     </>
@@ -1308,12 +1308,12 @@ export default function MapPage() {
 
               <div className="grid grid-cols-2 gap-4 mb-6">
                 <div className="bg-blue-50 p-4 rounded-lg">
-                  <p className="text-sm text-gray-600">Alan</p>
+                  <p className="text-sm text-gray-600">{t('map.detailArea')}</p>
                   <p className="text-2xl font-bold text-blue-600">{selectedParcel.area_hectares} ha</p>
                 </div>
                 <div className="bg-green-50 p-4 rounded-lg">
-                  <p className="text-sm text-gray-600">Durum</p>
-                  <p className="text-2xl font-bold text-green-600">✓ Aktif</p>
+                  <p className="text-sm text-gray-600">{t('map.detailStatus')}</p>
+                  <p className="text-2xl font-bold text-green-600">{t('map.detailActive')}</p>
                 </div>
               </div>
 
@@ -1322,25 +1322,25 @@ export default function MapPage() {
                   onClick={() => navigate(`/parcels/${selectedParcel.id}/satellite`)}
                   className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded font-medium"
                 >
-                  🛰️ Uydu Görüntüsü
+                  {t('map.detailSatellite')}
                 </button>
                 <button
                   onClick={() => setIsEditingParcel(true)}
                   className="flex-1 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded font-medium"
                 >
-                  ✏️ Düzenle
+                  {t('map.detailEdit')}
                 </button>
                 <button
                   onClick={handleDeleteParcel}
                   className="flex-1 bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded font-medium"
                 >
-                  🗑️ Sil
+                  {t('map.detailDelete')}
                 </button>
                 <button
                   onClick={handleCancelEdit}
                   className="flex-1 bg-gray-300 hover:bg-gray-400 text-gray-800 px-4 py-2 rounded font-medium"
                 >
-                  Kapat
+                  {t('common.close')}
                 </button>
               </div>
             </div>
