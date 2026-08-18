@@ -1,7 +1,7 @@
 import React from "react";
 import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-dom";
 import { useAuthStore } from "./store/auth";
-import { LanguageSwitcher } from "./components/LanguageSwitcher";
+import Header from "./components/Header";
 import DashboardPage from "./pages/DashboardPage";
 import LoginPage from "./pages/LoginPage";
 import RegisterPage from "./pages/RegisterPage";
@@ -18,13 +18,12 @@ const ProtectedRoute = ({ element }: { element: React.ReactNode }) => {
 };
 
 export default function App() {
+  const { token } = useAuthStore();
+
   return (
-    <>
-      <div className="flex justify-end p-4 bg-gray-100">
-        <LanguageSwitcher />
-      </div>
-      <Router>
-        <Routes>
+    <Router>
+      {token && <Header />}
+      <Routes>
           <Route path="/login" element={<LoginPage />} />
           <Route path="/register" element={<RegisterPage />} />
           <Route path="/privacy-policy" element={<PrivacyPolicy />} />
@@ -44,8 +43,7 @@ export default function App() {
           <Route path="/parcels/:parcelId/satellite" element={<ProtectedRoute element={<SatellitePage />} />} />
 
           <Route path="/" element={<Navigate to="/dashboard" />} />
-        </Routes>
-      </Router>
-    </>
+      </Routes>
+    </Router>
   );
 }
