@@ -615,6 +615,10 @@ async def fetch_satellite_image(parcel_id: int, background_tasks: BackgroundTask
 EE_SERVICE_ACCOUNT = "atp-976@renta-platform-505621.iam.gserviceaccount.com"
 EE_KEY_PATH = os.getenv("EE_SERVICE_ACCOUNT_KEY", str(Path(__file__).parent / "renta-key.json"))
 
+# initialize_earth_engine()'ın kullandığı credential objesini burada
+# saklıyoruz ki get_ee_session() aynısını yeniden kullanabilsin.
+_ee_credentials = None
+
 
 def initialize_earth_engine():
     """
@@ -623,6 +627,8 @@ def initialize_earth_engine():
     interaktif tarayıcı girişine ihtiyaç duymaz. Dosya yoksa (örn. eski
     yerel kurulum), ee.Authenticate()'ten kalma kişisel oturuma düşer.
     """
+    global _ee_credentials
+
     print(f'🔍 [EE-INIT] EE_KEY_PATH = {EE_KEY_PATH}')
     print(f'🔍 [EE-INIT] os.path.exists(EE_KEY_PATH) = {os.path.exists(EE_KEY_PATH)}')
     print(f'🔍 [EE-INIT] EE_SERVICE_ACCOUNT_KEY env var = {os.getenv("EE_SERVICE_ACCOUNT_KEY")}')
@@ -635,22 +641,28 @@ def initialize_earth_engine():
         print('🔍 [EE-INIT] Service account key bulundu, ServiceAccountCredentials deneniyor...')
         credentials = ee.ServiceAccountCredentials(EE_SERVICE_ACCOUNT, EE_KEY_PATH)
         ee.Initialize(credentials, project='renta-platform-505621')
+        _ee_credentials = credentials
         print('🔍 [EE-INIT] Service account ile başarıyla initialize edildi.')
     else:
         print(f'⚠ [EE-INIT] {EE_KEY_PATH} bulunamadı, kişisel ee.Authenticate() oturumuna düşülüyor')
         ee.Initialize(project='renta-platform-505621')
+        _ee_credentials = ee.data.get_persistent_credentials()
 
 
 def get_ee_session() -> AuthorizedSession:
     """
     EE thumbnail URL'leri authenticated bir istek gerektiriyor.
-    google.auth.default() (ayrı bir ADC/service-account kurulumu gerektirir)
-    yerine, ee.Initialize()'ın zaten başarıyla kullandığı kimlik bilgilerini
-    doğrudan EE'den alıyoruz. ee.Initialize() çalışıyorsa bu da çalışır,
-    ekstra bir ortam değişkeni ayarlamaya gerek kalmaz.
+    initialize_earth_engine()'ın kullandığı AYNI credential objesini
+    (service account ya da kişisel oturum, hangisiyse) yeniden kullanıyoruz.
+    ee.data.get_persistent_credentials() sadece kişisel OAuth oturumunu
+    bildiği için service account senaryosunda yanlış sonuç veriyordu —
+    bu yüzden artık initialize_earth_engine()'da saklanan objeyi kullanıyoruz.
     """
-    credentials = ee.data.get_persistent_credentials()
-    return AuthorizedSession(credentials)
+    global _ee_credentials
+    if _ee_credentials is None:
+        # Güvenlik ağı: initialize_earth_engine() bir şekilde hiç çağrılmadıysa
+        _ee_credentials = ee.data.get_persistent_credentials()
+    return AuthorizedSession(_ee_credentials)
 
 
 # --- Kalıcı uydu görüntüsü depolama ---
