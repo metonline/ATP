@@ -34,6 +34,15 @@ export default function App() {
           <Route path="/parcel/:id" element={<ProtectedRoute element={<ParcelPage />} />} />
           <Route path="/profile" element={<ProtectedRoute element={<ProfilePage />} />} />
           <Route path="/satellite/:parcelId" element={<ProtectedRoute element={<SatellitePage />} />} />
+
+          {/* Geriye dönük uyumluluk: bugünkü oturumda MapPage/DashboardPage/ParcelPage
+              içindeki bazı link/navigate() çağrıları hâlâ eski yol şemasını kullanıyor
+              (/parcels, /parcels/:parcelId/satellite). Claude Code'un yeni şemasını
+              (/parcel/:id, /satellite/:parcelId) bozmadan, aynı sayfalara giden
+              ek (alias) route'lar ekliyoruz — ikisi de çalışsın diye. */}
+          <Route path="/parcels" element={<ProtectedRoute element={<ParcelPage />} />} />
+          <Route path="/parcels/:parcelId/satellite" element={<ProtectedRoute element={<SatellitePage />} />} />
+
           <Route path="/" element={<Navigate to="/dashboard" />} />
         </Routes>
       </Router>
