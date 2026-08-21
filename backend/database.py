@@ -103,6 +103,11 @@ class SatelliteImage(Base):
     status = Column(String, default="pending")
     error_message = Column(String, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
+    # Uydunun görüntüyü GERÇEKTEN çektiği tarih (created_at bizim ne zaman
+    # fetch ettiğimizi tutuyor, bu ise EE'nin system:time_start metadata'sından
+    # geliyor). Akıllı yenileme kontrolü (check_and_refresh_all_parcels) bu
+    # alana dayanıyor.
+    image_date = Column(DateTime, nullable=True)
     # NDVI (bitki sağlığı indeksi) alanları
     mean_ndvi = Column(Float, nullable=True)  # Parselin ortalama NDVI değeri (-1..1)
     ndvi_url = Column(String, nullable=True)  # Renklendirilmiş NDVI haritasının EE thumbnail URL'i
