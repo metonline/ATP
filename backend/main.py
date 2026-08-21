@@ -64,6 +64,28 @@ async def add_no_cache_headers(request: Request, call_next):
 @app.on_event("startup")
 async def startup():
     init_db()
+
+    # image_date kolonu sonradan eklendi (akıllı yenileme kontrolü için).
+    # init_db()'deki create_all() sadece YENİ tabloları oluşturur, var olan
+    # bir tabloya kolon eklemez — bu yüzden burada elle, idempotent şekilde
+    # kontrol edip gerekiyorsa ekliyoruz. Render'da Shell erişimi olmadan da
+    # her deploy'da otomatik çalışsın diye startup'a gömüldü.
+    try:
+        import sqlite3
+        db_path = os.getenv("DATABASE_URL", "sqlite:///./ia_platform.db").replace("sqlite:///./", "")
+        if os.path.exists(db_path):
+            conn = sqlite3.connect(db_path)
+            cur = conn.cursor()
+            cur.execute("PRAGMA table_info(satellite_images)")
+            existing_columns = {row[1] for row in cur.fetchall()}
+            if "image_date" not in existing_columns:
+                cur.execute("ALTER TABLE satellite_images ADD COLUMN image_date DATETIME")
+                conn.commit()
+                print("✓ Migration: image_date kolonu eklendi")
+            conn.close()
+    except Exception as migration_err:
+        print(f"⚠ image_date migration kontrolü başarısız (Postgres'e geçilmişse normal, farklı yöntem gerekir): {migration_err}")
+
     print("âœ“ Database initialized")
 
 
@@ -768,6 +790,91 @@ def cleanup_old_satellite_images(parcel_id: int, keep: int = 3):
                 print(f'⚠ Eski dosya silinemedi ({old_file.name}): {cleanup_err}')
 
 
+def get_latest_available_image_date(lat: float, lng: float) -> Optional[datetime]:
+    """
+    Bu koordinat için EE'de mevcut en son Sentinel-2 görüntüsünün gerçek
+    çekim tarihini döner — sadece metadata sorgusu, piksel indirmiyor,
+    çok ucuz/hızlı bir işlem. "Yeni görüntü var mı?" kontrolü için kullanılır.
+    """
+    geometry = ee.Geometry.Point([lng, lat])
+    end_date = datetime.utcnow().strftime('%Y-%m-%d')
+    start_date = (datetime.utcnow() - timedelta(days=30)).strftime('%Y-%m-%d')
+
+    image = ee.ImageCollection('COPERNICUS/S2_SR_HARMONIZED')\
+        .filterBounds(geometry)\
+        .filterDate(start_date, end_date)\
+        .filter(ee.Filter.lt('CLOUDY_PIXEL_PERCENTAGE', 30))\
+        .sort('system:time_start', False)\
+        .first()
+
+    if image is None:
+        return None
+
+    timestamp_ms = image.get('system:time_start').getInfo()
+    if timestamp_ms is None:
+        return None
+
+    return datetime.utcfromtimestamp(timestamp_ms / 1000)
+
+
+def check_and_refresh_all_parcels():
+    """
+    Gerçek "push" mekanizması EE'de yok (bize kimse haber vermiyor), bu
+    yüzden bunun yerine "kontrol et, gerekirse çek" (pull + dedup)
+    yaklaşımı kullanıyoruz: her aktif parsel için EE'deki en son mevcut
+    görüntünün tarihine bakıyoruz; elimizdeki en son başarılı fetch'ten
+    daha yeniyse tam işlemi (6 endeks + RGB indirme) tetikliyoruz, değilse
+    atlıyoruz — gereksiz EE kotası/depolama harcamıyoruz.
+
+    Render'da ayrı bir Cron Job kaynağının günlük çağırması için tasarlandı
+    (bkz. check_new_images.py).
+    """
+    from database import SessionLocal, Parcel, SatelliteImage
+
+    initialize_earth_engine()
+    db = SessionLocal()
+    checked = 0
+    refreshed = 0
+
+    try:
+        parcels = db.query(Parcel).filter(Parcel.is_active == True).all()
+        print(f'🔄 [AUTO-CHECK] {len(parcels)} aktif parsel kontrol ediliyor...')
+
+        for parcel in parcels:
+            checked += 1
+            try:
+                latest_available = get_latest_available_image_date(parcel.centroid_lat, parcel.centroid_lon)
+                if latest_available is None:
+                    print(f'  Parsel {parcel.id}: bu bölge için uygun görüntü bulunamadı (bulut/tarih), atlanıyor')
+                    continue
+
+                last_success = db.query(SatelliteImage)\
+                    .filter(SatelliteImage.parcel_id == parcel.id, SatelliteImage.status == 'success')\
+                    .order_by(SatelliteImage.created_at.desc())\
+                    .first()
+
+                needs_refresh = (
+                    last_success is None
+                    or last_success.image_date is None
+                    or latest_available > last_success.image_date
+                )
+
+                if needs_refresh:
+                    print(f'  Parsel {parcel.id}: yeni görüntü bulundu ({latest_available.date()}), fetch tetikleniyor')
+                    fetch_satellite_bg(parcel.id, parcel.centroid_lat, parcel.centroid_lon)
+                    refreshed += 1
+                else:
+                    print(f'  Parsel {parcel.id}: yeni görüntü yok (son: {last_success.image_date.date()}), atlanıyor')
+            except Exception as parcel_err:
+                print(f'  ⚠ Parsel {parcel.id} kontrol edilirken hata: {parcel_err}')
+
+        print(f'✓ [AUTO-CHECK] Tamamlandı — {checked} parsel kontrol edildi, {refreshed} tanesi yenilendi')
+    finally:
+        db.close()
+
+    return {"checked": checked, "refreshed": refreshed}
+
+
 def fetch_satellite_bg(parcel_id: int, lat: float, lng: float):
     """Background: Sentinel-2 uydu görüntüsünü indir"""
     from database import SessionLocal, SatelliteImage
@@ -782,17 +889,36 @@ def fetch_satellite_bg(parcel_id: int, lat: float, lng: float):
         initialize_earth_engine()
         
         geometry = ee.Geometry.Point([lng, lat])
+
+        # Sabit tarih aralığı yerine kayan pencere: her zaman "bugünden
+        # geriye 30 gün" arıyoruz. Sabit bir aralık (örn. '2026-06-01' -
+        # '2026-08-15') bir süre sonra geçmişte kalıp hiç yeni görüntü
+        # bulamaz hale geliyordu — bu, gerçek bir üretim hatasıydı.
+        end_date = datetime.utcnow().strftime('%Y-%m-%d')
+        start_date = (datetime.utcnow() - timedelta(days=30)).strftime('%Y-%m-%d')
+
         # SR_HARMONIZED = atmosfer düzeltmeli surface reflectance.
         # S2_HARMONIZED (TOA) atmosferik saçılma yüzünden renk kaymasına
         # (pembe/eflatun ton) sebep oluyordu.
         image = ee.ImageCollection('COPERNICUS/S2_SR_HARMONIZED')\
             .filterBounds(geometry)\
-            .filterDate('2026-06-01', '2026-08-15')\
+            .filterDate(start_date, end_date)\
             .filter(ee.Filter.lt('CLOUDY_PIXEL_PERCENTAGE', 30))\
             .sort('system:time_start', False)\
             .first()
         
         if image:
+            # Bu görüntünün UYDU tarafından gerçekten çekildiği tarih —
+            # "biz ne zaman fetch ettik" (created_at) değil, "uydu ne zaman
+            # çekti" (image_date). Akıllı yenileme kontrolü bu ayrıma
+            # dayanıyor: yeni bir uydu geçişi olduğunda mı, yoksa biz
+            # sorguladığımızda mı yeni sayılacak.
+            image_timestamp_ms = image.get('system:time_start').getInfo()
+            image_acquisition_date = (
+                datetime.utcfromtimestamp(image_timestamp_ms / 1000)
+                if image_timestamp_ms else None
+            )
+
             # Parsel polygon'ıyla clip et
             import json
             parcel = db.query(Parcel).filter(Parcel.id == parcel_id).first()
@@ -936,6 +1062,7 @@ def fetch_satellite_bg(parcel_id: int, lat: float, lng: float):
             
             if image_record:
                 image_record.url = url
+                image_record.image_date = image_acquisition_date
                 image_record.ndvi_url = index_results['ndvi']['url']
                 image_record.mean_ndvi = index_results['ndvi']['mean']
                 image_record.ndre_url = index_results['ndre']['url']
@@ -1000,6 +1127,7 @@ async def get_satellite_image(parcel_id: int, db: Session = Depends(get_db)):
             "parcel_id": image.parcel_id,
             "status": image.status,
             "url": image.url,
+            "image_date": image.image_date.isoformat() if image.image_date else None,
             "mean_ndvi": image.mean_ndvi,
             "ndvi_url": image.ndvi_url,
             "mean_ndre": image.mean_ndre,
@@ -1050,6 +1178,25 @@ def get_current_admin(token: str, db: Session) -> Farmer:
     if not farmer or not farmer.is_admin:
         raise HTTPException(status_code=403, detail="Admin access required")
     return farmer
+
+
+@app.post("/api/admin/check-satellite-updates")
+async def trigger_satellite_check(
+    background_tasks: BackgroundTasks,
+    authorization: Optional[str] = Header(None),
+    db: Session = Depends(get_db)
+):
+    """
+    Tüm aktif parselleri kontrol edip, sadece EE'de gerçekten yeni bir
+    görüntü varsa fetch tetikler. Render'daki Cron Job bunu düzenli
+    (örn. günlük) çağıracak; bu endpoint elle test/tetikleme için.
+    """
+    token = extract_token_from_header(authorization)
+    admin = get_current_admin(token, db)
+
+    background_tasks.add_task(check_and_refresh_all_parcels)
+    print(f'🔄 Satellite check tetiklendi (admin: {admin.email})')
+    return {"message": "Kontrol arka planda başlatıldı, birkaç dakika sürebilir"}
 
 
 @app.get("/api/admin/pending-users")
