@@ -325,8 +325,8 @@ export default function MapPage() {
       return;
     }
 
-    if (lat < 36 || lat > 42 || lng < 26 || lng > 45) {
-      setError(t('map.errCoordinateOutsideTurkey'));
+    if (lat < -90 || lat > 90 || lng < -180 || lng > 180) {
+      setError(t('map.errCoordinateOutOfRange'));
       return;
     }
 
@@ -348,7 +348,7 @@ export default function MapPage() {
     try {
       setError('');
       const response = await fetch(
-        `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(addressSearch)}&format=json&limit=5&countrycodes=tr`
+        `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(addressSearch)}&format=json&limit=5`
       );
       const results = await response.json();
 

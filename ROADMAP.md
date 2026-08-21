@@ -87,6 +87,7 @@
 - [ ] **Çok-modlu veri girişi** (ses, SMS/WhatsApp, video) — belirli bir modülle sınırlı değil, farklı modüllere aşamalı eklenebilir
 - [ ] **İki dillilik (TR/EN)** — ayrı oturumda ele alınacak (react-i18next)
 - [ ] **PostGIS'e geçiş** — mekansal sorgular gerçek ihtiyaç haline gelince (şu an SQLite+GeoJSON text yeterli)
+- [ ] **Nominatim'i kendi sunucunda barındırma** — adres arama artık dünya geneline açık (Türkiye kısıtı kaldırıldı, 18 Ağustos 2026), ama hâlâ OpenStreetMap'in ücretsiz genel Nominatim API'sini kullanıyor. Bu servisin kullanım politikası yoğun trafiği desteklemiyor (kabaca saniyede 1 istek sınırı) — kullanıcı sayısı arttıkça (binlerce çiftçi hedefi) bu sınıra takılabiliriz. Çözüm: kendi Nominatim örneğini barındırmak ya da ücretli bir geocoding servisine (Google Geocoding, Mapbox, HERE) geçmek.
 
 ---
 
