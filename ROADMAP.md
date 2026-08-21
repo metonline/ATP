@@ -16,7 +16,7 @@
 
 ## Faz 0: Pilot'a Hazırlık (20-100 çiftçi öncesi zorunlu)
 
-- [ ] **KVKK uyumluluğu** — gizlilik politikası sayfası, kayıt sırasında açık rıza onayı, "verilerimi indir/sil" özelliği
+- [x] **KVKK uyumluluğu (kısmi)** — rıza onayı (kayıt sırasında checkbox) ve admin onay akışı kuruldu, `is_approved`/`kvkk_consent` alanları var. **Eksik kalan:** "verilerimi indir/sil" self-servis özelliği henüz yok.
 - [ ] **Postgres'e geçiş** (SQLite yerine) — Kod zaten hazır (`DATABASE_URL` env var, `database.py`'de "SQLite for MVP, scales to PostgreSQL later" yorumu). **Neden erken yapılmalı, geç değil:** sorun veri hacmi değil, SQLite'ın tek dosya/tek sunucu sınırı — iş planındaki "auto-scaling, çoklu sunucu" hedefiyle yapısal olarak uyumsuz. Veri hâlâ test aşamasındayken (gerçek çiftçi verisi yokken) yapmak, üretimde sıfır kesinti toleransıyla yapmaktan çok daha ucuz/güvenli.
 - [ ] **🐛 Bilinen hata — görüntü dosyası/DB satırı tutarsızlığı:** Her fetch yeni bir `SatelliteImage` satırı oluşturuyor (trend grafiği için doğru, geçmiş veri korunmalı), ama diskteki dosyalar parsel başına sadece 3 ile sınırlı (`cleanup_old_satellite_images`). 4. fetch'ten sonra eski satırların `ndvi_url` vb. alanları hâlâ DB'de duruyor ama işaret ettikleri dosya silinmiş oluyor — Analiz sayfası geçmişe gidince kırık görsel riski var. **Çözüm yönü:** sayısal değerleri (`mean_ndvi` vb.) süresiz sakla (zaten öyle), ama görselleri ya S3/GCS gibi kalıcı bir depoya taşı (sınırsız saklanabilir), ya da eski satırlarda `ndvi_url`'i null'a çekip UI'da "bu tarihe ait görsel artık mevcut değil, sadece sayısal değer" diye göster.
 - [ ] **Kalıcı dosya depolama** — Postgres veri tarafını çözer ama `satellite_images/` klasöründeki PNG dosyaları ayrı bir sorun; Render disk (Postgres'le birlikte otomatik gelmiyor) ya da S3/GCS gerekiyor
@@ -85,7 +85,7 @@
 ## Kesişen / her fazı etkileyebilecek işler
 
 - [ ] **Çok-modlu veri girişi** (ses, SMS/WhatsApp, video) — belirli bir modülle sınırlı değil, farklı modüllere aşamalı eklenebilir
-- [ ] **İki dillilik (TR/EN)** — ayrı oturumda ele alınacak (react-i18next)
+- [x] **İki dillilik (TR/EN)** — 18 Ağustos 2026'da tamamlandı: 240 çeviri anahtarı, tüm sayfalar (Header, Dashboard, Map, Parcel, Satellite, Profile, Login), bayrak toggle
 - [ ] **PostGIS'e geçiş** — mekansal sorgular gerçek ihtiyaç haline gelince (şu an SQLite+GeoJSON text yeterli)
 - [ ] **Nominatim'i kendi sunucunda barındırma** — adres arama artık dünya geneline açık (Türkiye kısıtı kaldırıldı, 18 Ağustos 2026), ama hâlâ OpenStreetMap'in ücretsiz genel Nominatim API'sini kullanıyor. Bu servisin kullanım politikası yoğun trafiği desteklemiyor (kabaca saniyede 1 istek sınırı) — kullanıcı sayısı arttıkça (binlerce çiftçi hedefi) bu sınıra takılabiliriz. Çözüm: kendi Nominatim örneğini barındırmak ya da ücretli bir geocoding servisine (Google Geocoding, Mapbox, HERE) geçmek.
 
